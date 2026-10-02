@@ -1,0 +1,31 @@
+# Build output
+bin/
+obj/
+[Rr]elease/
+[Dd]ebug/
+.vs/
+*.user
+TestResults/
+
+# Player data, secrets and runtime state: never commit
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+account.txt
+serverconfig.xml
+logs/
+backups/
+run/
+*.log
+
+# Imported world data (comes from the official release via tools/world-import.sh)
+*.nav
+
+# Native build output
+src/Pathing/Detour/build/
+src/build/
+dist/
+.cache/

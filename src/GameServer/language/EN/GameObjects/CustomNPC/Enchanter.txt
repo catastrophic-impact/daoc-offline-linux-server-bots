@@ -1,0 +1,32 @@
+﻿# Enchanter NPC
+
+## Examine
+GameNPC.Enchanter.GetExamineMessages.YouTarget:		    You target [{0}].
+GameNPC.Enchanter.GetExamineMessages.YouExamine:		You examine {0}. {1} is {2} and is an enchanter.
+GameNPC.Enchanter.GetExamineMessages.GiveItem:		    [Give {0} an item to be magically enhanced]
+
+## Accept/Decline Enchant
+GameNPC.Enchanter.Interact.Message:			            {0} says, "For a small fee, I can infuse your weapons or armor with an enchantment that will improve their quality. Just hand me the item. It must be of a material I can work with."
+GameNPC.Enchanter.ReceiveItem.Cost:			            It will cost {0} to enchant that. Do you accept?
+GameNPC.Enchanter.Response.YouGive:	                    You give {0} {1}.
+GameNPC.Enchanter.Response.Decline:                     You decline to have your {0} enchanted.
+
+## Receive Responses
+GameNPC.Enchanter.Response.NotEnoughMoney:	            {0} says, "It costs {1} to enchant {2}. You don't have that much."
+GameNPC.Enchanter.NotEnoughMoney:			            {0} says, "I need {1} to enchant that."
+GameNPC.Enchanter.Response.CantEnchant:	                {0} says, "I can't enchant that."
+GameNPC.Enchanter.ReceiveItem.AlreadyEnchanted:			{0} says, "That is already enchanted."
+GameNPC.Enchanter.ReceiveItem.CantBeEnchanted:			{0} says, "That item can't be enchanted."
+GameNPC.Enchanter.ReceiveItem.CantEnchantMaterial:	    {0} says, "I can't enchant that material."
+GameNPC.Enchanter.Response.NowEnchanted:	            {0} says, "There, it is now {1}!"
+
+## Enchantment Labels
+GameNPC.Enchanter.ItemLevel.Bright:	                    bright
+GameNPC.Enchanter.ItemLevel.Shining:                    shining
+GameNPC.Enchanter.ItemLevel.Lustrous:                   lustrous
+GameNPC.Enchanter.ItemLevel.Luminous:                   luminous
+GameNPC.Enchanter.ItemLevel.Shimmering:                 shimmering
+
+## Not Used
+GameNPC.Enchanter.Interact.Quartz:			            quartz
+GameNPC.Enchanter.Interact.Steel:			            steel

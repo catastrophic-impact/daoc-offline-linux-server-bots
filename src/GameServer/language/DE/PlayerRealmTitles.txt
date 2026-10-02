@@ -1,0 +1,105 @@
+﻿# Unknown
+GamePlayer.RealmTitle.UnknownRealm:					Unbekanntes Reich
+
+# Starter titles
+GamePlayer.RealmTitle.Defender:						Verteidiger
+GamePlayer.RealmTitle.Invader:						Eindringling
+
+# Albion
+# /Male
+GamePlayer.RealmTitle.Albion.RR0.Male:				Eindringling
+GamePlayer.RealmTitle.Albion.RR1.Male:				Wächter
+GamePlayer.RealmTitle.Albion.RR2.Male:				Bewahrer
+GamePlayer.RealmTitle.Albion.RR3.Male:				Myrmidon
+GamePlayer.RealmTitle.Albion.RR4.Male:				Greifenritter
+GamePlayer.RealmTitle.Albion.RR5.Male:				Adlerritter
+GamePlayer.RealmTitle.Albion.RR6.Male:				Phönixritter
+GamePlayer.RealmTitle.Albion.RR7.Male:				Alerionritter
+GamePlayer.RealmTitle.Albion.RR8.Male:				Einhornritter
+GamePlayer.RealmTitle.Albion.RR9.Male:				Löwenritter
+GamePlayer.RealmTitle.Albion.RR10.Male:				Drachenritter
+GamePlayer.RealmTitle.Albion.RR11.Male:				Lord
+GamePlayer.RealmTitle.Albion.RR12.Male:				Freiherr
+GamePlayer.RealmTitle.Albion.RR13.Male:				Baron
+
+# /Female
+GamePlayer.RealmTitle.Albion.RR0.Female:			Eindringling
+GamePlayer.RealmTitle.Albion.RR1.Female:			Wächterin
+GamePlayer.RealmTitle.Albion.RR2.Female:			Bewahrerin
+GamePlayer.RealmTitle.Albion.RR3.Female:			Myrmidon
+GamePlayer.RealmTitle.Albion.RR4.Female:			Greifenritterin
+GamePlayer.RealmTitle.Albion.RR5.Female:			Adlerritterin
+GamePlayer.RealmTitle.Albion.RR6.Female:			Phönixritterin
+GamePlayer.RealmTitle.Albion.RR7.Female:			Alerionritterin
+GamePlayer.RealmTitle.Albion.RR8.Female:			Einhornritterin
+GamePlayer.RealmTitle.Albion.RR9.Female:			Löwenritterin
+GamePlayer.RealmTitle.Albion.RR10.Female:			Drachenritterin
+GamePlayer.RealmTitle.Albion.RR11.Female:			Lady
+GamePlayer.RealmTitle.Albion.RR12.Female:			Freifrau
+GamePlayer.RealmTitle.Albion.RR13.Female:			Baroness
+
+# Midgard
+# /Male
+GamePlayer.RealmTitle.Midgard.RR0.Male:				Eindringling
+GamePlayer.RealmTitle.Midgard.RR1.Male:				Skiltvakten
+GamePlayer.RealmTitle.Midgard.RR2.Male:				Isen Vakten
+GamePlayer.RealmTitle.Midgard.RR3.Male:				Flammen Vakten
+GamePlayer.RealmTitle.Midgard.RR4.Male:				Elding Vakten
+GamePlayer.RealmTitle.Midgard.RR5.Male:				Stormur Vakten
+GamePlayer.RealmTitle.Midgard.RR6.Male:				Isen Herra
+GamePlayer.RealmTitle.Midgard.RR7.Male:				Flammen Herra
+GamePlayer.RealmTitle.Midgard.RR8.Male:				Elding Herra
+GamePlayer.RealmTitle.Midgard.RR9.Male:				Stormur Herra
+GamePlayer.RealmTitle.Midgard.RR10.Male:			Einherjar
+GamePlayer.RealmTitle.Midgard.RR11.Male:			Herra
+GamePlayer.RealmTitle.Midgard.RR12.Male:			Hersir
+GamePlayer.RealmTitle.Midgard.RR13.Male:			Vicomte
+
+# /Female
+GamePlayer.RealmTitle.Midgard.RR0.Female:			Eindringling
+GamePlayer.RealmTitle.Midgard.RR1.Female:			Skiltvakten
+GamePlayer.RealmTitle.Midgard.RR2.Female:			Isen Vakten
+GamePlayer.RealmTitle.Midgard.RR3.Female:			Flammen Vakten
+GamePlayer.RealmTitle.Midgard.RR4.Female:			Elding Vakten
+GamePlayer.RealmTitle.Midgard.RR5.Female:			Stormur Vakten
+GamePlayer.RealmTitle.Midgard.RR6.Female:			Isen Fru
+GamePlayer.RealmTitle.Midgard.RR7.Female:			Flammen Fru
+GamePlayer.RealmTitle.Midgard.RR8.Female:			Elding Fru
+GamePlayer.RealmTitle.Midgard.RR9.Female:			Stormur Fru
+GamePlayer.RealmTitle.Midgard.RR10.Female:			Einherjar
+GamePlayer.RealmTitle.Midgard.RR11.Female:			Fru
+GamePlayer.RealmTitle.Midgard.RR12.Female:			Baronsfru
+GamePlayer.RealmTitle.Midgard.RR13.Female:			Vicomtessa
+
+# Hibernia
+# /Male
+GamePlayer.RealmTitle.Hibernia.RR0.Male:			Verteidiger
+GamePlayer.RealmTitle.Hibernia.RR1.Male:			Weiser
+GamePlayer.RealmTitle.Hibernia.RR2.Male:			Cosantoir
+GamePlayer.RealmTitle.Hibernia.RR3.Male:			Brehon
+GamePlayer.RealmTitle.Hibernia.RR4.Male:			Forstbewahrer
+GamePlayer.RealmTitle.Hibernia.RR5.Male:			Rabenjünger
+GamePlayer.RealmTitle.Hibernia.RR6.Male:			Silberband
+GamePlayer.RealmTitle.Hibernia.RR7.Male:			Donnerer
+GamePlayer.RealmTitle.Hibernia.RR8.Male:			Goldspeer
+GamePlayer.RealmTitle.Hibernia.RR9.Male:			Tiarna
+GamePlayer.RealmTitle.Hibernia.RR10.Male:			Smaragdreiter
+GamePlayer.RealmTitle.Hibernia.RR11.Male:			Barun
+GamePlayer.RealmTitle.Hibernia.RR12.Male:			Ard Tiarna
+GamePlayer.RealmTitle.Hibernia.RR13.Male:			Ciann Cath
+
+# /Female
+GamePlayer.RealmTitle.Hibernia.RR0.Female:			Verteidiger
+GamePlayer.RealmTitle.Hibernia.RR1.Female:			Weise
+GamePlayer.RealmTitle.Hibernia.RR2.Female:			Cosantoir
+GamePlayer.RealmTitle.Hibernia.RR3.Female:			Brehon
+GamePlayer.RealmTitle.Hibernia.RR4.Female:			Forstbewahrerin
+GamePlayer.RealmTitle.Hibernia.RR5.Female:			Rabenjüngerin
+GamePlayer.RealmTitle.Hibernia.RR6.Female:			Silberband
+GamePlayer.RealmTitle.Hibernia.RR7.Female:			Donnerer
+GamePlayer.RealmTitle.Hibernia.RR8.Female:			Goldspeer
+GamePlayer.RealmTitle.Hibernia.RR9.Female:			Bantiarna
+GamePlayer.RealmTitle.Hibernia.RR10.Female:			Smaragdreiterin
+GamePlayer.RealmTitle.Hibernia.RR11.Female:			Banbharun
+GamePlayer.RealmTitle.Hibernia.RR12.Female:			Ard Bantiarna
+GamePlayer.RealmTitle.Hibernia.RR13.Female:			Ciann Cath

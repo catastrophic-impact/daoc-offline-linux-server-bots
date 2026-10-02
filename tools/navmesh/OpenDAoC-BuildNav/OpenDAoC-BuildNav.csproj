@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
+    <RootNamespace>OpenDAoC_BuildNav</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableLibraryImportGenerator>true</EnableLibraryImportGenerator>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Emgu.CV" Version="4.10.0.5680" />
+    <PackageReference Include="Emgu.CV.runtime.windows" Version="4.10.0.5680" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="OpenTK">
+      <HintPath>OpenTK.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenDAoC-Core\Pathing\Detour.Managed\Detour.Managed.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyBaseFolder" AfterTargets="Build">
+    <ItemGroup>
+      <BaseFiles Include="$(ProjectDir)base\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BaseFiles)" DestinationFolder="$(TargetDir)base\%(RecursiveDir)" />
+  </Target>
+
+  <Target Name="CopyDetourNative" AfterTargets="Build">
+    <PropertyGroup>
+      <_DetourDll>$(ProjectDir)..\OpenDAoC-Core\Pathing\Detour\Build\Release\Detour.dll</_DetourDll>
+    </PropertyGroup>
+    <MakeDir Directories="$(TargetDir)base\lib" Condition="Exists('$(_DetourDll)')" />
+    <Copy SourceFiles="$(_DetourDll)" DestinationFiles="$(TargetDir)base\lib\Detour.dll" Condition="Exists('$(_DetourDll)')" SkipUnchangedFiles="true" />
+    <Warning Text="Detour.dll not found at $(_DetourDll). Ladder second-pass placement will fail until it is present under $(TargetDir)base\lib\Detour.dll." Condition="!Exists('$(_DetourDll)')" />
+  </Target>
+
+</Project>

@@ -1,0 +1,71 @@
+﻿# GameLiving
+
+## Pronouns
+GameLiving.Pronoun.Neutral.Objective:			it
+GameLiving.Pronoun.Neutral.Possessive:			its
+GameLiving.Pronoun.Neutral.Subjective:			it
+GameLiving.Pronoun.Male.Objective:			him
+GameLiving.Pronoun.Male.Possessive:			his
+GameLiving.Pronoun.Male.Subjective:			he
+GameLiving.Pronoun.Female.Objective:			her
+GameLiving.Pronoun.Female.Possessive:			her
+GameLiving.Pronoun.Female.Subjective:			she
+GamePlayer.Pronoun.Female.Objective:		her
+GamePlayer.Pronoun.Female.Possessive:		her
+GamePlayer.Pronoun.Female.Subjective:		she
+GamePlayer.Pronoun.Male.Objective:			him
+GamePlayer.Pronoun.Male.Possessive:			his
+GamePlayer.Pronoun.Male.Subjective:			he
+GameKeepGuard.GetPronoun.He:			He
+GameKeepGuard.GetPronoun.Her:			Her
+GameKeepGuard.GetPronoun.Hers:			Hers
+GameKeepGuard.GetPronoun.Him:			Him
+GameKeepGuard.GetPronoun.His:			His
+GameKeepGuard.GetPronoun.She:			She
+
+## Attack Data (Pet)
+GameLiving.AttackData.Fumbled:			{0} fumbled!
+GameLiving.AttackData.Misses:			{0} attacks your {1} and misses!
+GameLiving.AttackData.Blocked:			{0} attacks your {1} and is blocked!
+GameLiving.AttackData.Parried:			{0} attacks your {1} and is parried!
+GameLiving.AttackData.CriticallyHitsForDamage:	{0} critically hits your {1} for an additional {2} damage.
+GameLiving.AttackData.Evaded:			{0} attacks your {1} and is evaded!
+GameLiving.AttackData.HitsForDamage:		{0} hits your {1} for {2}{3} damage.
+GameLiving.AttackData.YourCriticallyHits:	Your {0} critically hits {1} for an additional {2} damage!
+GameLiving.AttackData.YourHits:			Your {0} {1} {2} and hits for {3}{4} damage!
+GamePlayer.CommandNpcAttack.TooFarAwayForPet:		Your target is too far away to attack with your pet!
+
+## Attack Data (Attacker)
+GamePlayer.Attack.Blocked:					{0} blocks your attack!
+GamePlayer.Attack.Parried:					{0} parries your attack!
+GamePlayer.Attack.Evaded:					{0} evades your attack!
+GamePlayer.Attack.Missed:					{0} attacks you and misses!
+GamePlayer.Attack.HitsYou:					{0} hits you for {1}{2} damage!
+GamePlayer.Attack.HitsYouCritical:			{0} critical hits you for an additional {1} damage!
+GamePlayer.Attack.HitsYour:					{0} hits your {1} for {2}{3} damage!
+
+## Intercept (Other)
+GamePlayer.Attack.Intercepted:				{0} steps in front of {1} and takes the blow!
+GamePlayer.Attack.InterceptedHit:			{0} {1}{2} but hit {3} for {4}{5} damage!
+GamePlayer.Attack.InterceptHit:				{0} {1}{2} and hit for {3}{4} damage!
+
+## Pet Commands
+GamePlayer.CommandNpcGoTarget.MustSelectDestination:You must select a destination for your controlled creature.
+GamePlayer.CommandNpcAttack.KillTarget:			You command {0} to kill your target!
+GamePlayer.CommandNpcAttack.IsConfused:			Your {0} is confused!
+GamePlayer.CommandNpcAttack.FollowYou:			You command {0} to follow you!
+GamePlayer.CommandNpcAttack.Stay:				You command {0} to stay in this position!
+GamePlayer.CommandNpcAttack.ComeHere:			You command {0} to come to you.
+GamePlayer.CommandNpcAttack.GoToTarget:			You command {0} to go to your target.
+GamePlayer.CommandNpcAttack.Passive:			You command {0} to disengage from combat!
+GamePlayer.CommandNpcAttack.Aggressive:			You command {0} to attack all enemies!
+GamePlayer.CommandNpcAttack.Defensive:			You command {0} to defend you!
+
+## Pet Control
+GamePlayer.SetControlledNpc.ReleaseTarget:		You release control of your controlled target.
+GamePlayer.SetControlledNpc.ReleaseTarget2:		You lose control of the {0}.
+GamePlayer.GamePet.StartSpell.UnderControl:             {0} is now under your control.
+GamePlayer.GamePet.Target.CantSeeTarget:                Your controlled {0} can't see {1} target!
+GamePlayer.GamePet.Movement.TooFarAway:                 Your controlled creature is too far away!
+GamePlayer.GamePet.SpellEnd.YouLoseControl:             You lose control of {0}!
+GamePlayer.GamePet.SpellEnd.YouReleaseControl:          You release control of your controlled target.

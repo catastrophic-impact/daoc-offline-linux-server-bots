@@ -1,0 +1,133 @@
+﻿using DOL.Database.Attributes;
+
+namespace DOL.Database
+{
+    /// <summary>
+    /// Saves an Appeal
+    /// </summary>
+    [DataTable(TableName = "Appeal")]
+    public class DbAppeal : DataObject
+    {
+        private string m_name;
+        private string m_account;
+        private int m_severity;
+        private string m_status;
+        private string m_timestamp;
+        private string m_text;
+
+        public string CurrentCharacterName { get; set; }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        public DbAppeal()
+        {
+            m_name = string.Empty;
+            m_account = string.Empty;
+            CurrentCharacterName = string.Empty;
+            m_severity = 0;
+            m_status = string.Empty;
+            m_timestamp = string.Empty;
+            m_text = string.Empty;
+        }
+
+        public DbAppeal(string name, string account, int severity, string status, string timestamp, string text)
+        {
+            m_name = name;
+            m_account = account;
+            CurrentCharacterName = name;
+            m_severity = severity;
+            m_status = status;
+            m_timestamp = timestamp;
+            m_text = text;
+            Dirty = true;
+        }
+
+        [DataElement(AllowDbNull = false, Index = true)]
+        public string Name
+        {
+            get { return m_name; }
+            set
+            {
+                m_name = value;
+                Dirty = true;
+            }
+        }
+
+        [DataElement(AllowDbNull = false, Index = true)]
+        public string Account
+        {
+            get { return m_account; }
+            set
+            {
+                m_account = value;
+                Dirty = true;
+            }
+        }
+
+
+        [DataElement(AllowDbNull = false)]
+        public int Severity
+        {
+            get { return m_severity; }
+            set
+            {
+                m_severity = value;
+                Dirty = true;
+            }
+        }
+
+        public string SeverityToName
+        {
+            get
+            {
+                switch (Severity)
+                {
+                    case 1:
+                        return "Low";
+                    case 2:
+                        return "Medium";
+                    case 3:
+                        return "High";
+                    case 4:
+                        return "Critical";
+                    default:
+                        return "none";
+                }
+            }
+            set { }
+        }
+
+        [DataElement(AllowDbNull = false)]
+        public string Status
+        {
+            get { return m_status; }
+            set
+            {
+                m_status = value;
+                Dirty = true;
+            }
+        }
+
+        [DataElement(AllowDbNull = false)]
+        public string Timestamp
+        {
+            get { return m_timestamp; }
+            set
+            {
+                m_timestamp = value;
+                Dirty = true;
+            }
+        }
+        [DataElement(AllowDbNull = false)]
+        public string Text
+        {
+            get { return m_text; }
+            set
+            {
+                m_text = value;
+                Dirty = true;
+            }
+        }
+    }
+}

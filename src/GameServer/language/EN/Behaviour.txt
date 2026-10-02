@@ -1,0 +1,8 @@
+﻿# Unique Behaviors
+## Message
+Behaviour.MessageAction.ReadMessage:		You read: "{0}"
+
+## Teleport
+Behaviour.TeleportAction.TeleportedToLoc:	{0} is being teleported to {1}.
+
+

@@ -1,0 +1,41 @@
+﻿namespace DOL.GS
+{
+    public class SpeedEnhancementECSEffect : ECSGameSpellEffect
+    {
+        public SpeedEnhancementECSEffect(in ECSGameEffectInitParams initParams) : base(initParams) { }
+
+        // Pulse parents can retain an older child after a different singer
+        // refreshes the same spell. This ownership flag must outlive the
+        // temporary IsBeingReplaced message-suppression flag.
+        internal bool IsSuperseded { get; set; }
+
+        public override bool Enable()
+        {
+            return !Owner.IsStealthed && base.Enable();
+        }
+
+        public override void OnStartEffect()
+        {
+            base.OnStartEffect();
+            Owner.BuffBonusMultCategory1.Set((int) eProperty.MaxSpeed, this, SpellHandler.Spell.Value / 100.0);
+            Owner.OnMaxSpeedChange();
+            OnEffectStartsMsg(true, true, true);
+        }
+
+        public override void OnStopEffect()
+        {
+            base.OnStopEffect();
+            Owner.BuffBonusMultCategory1.Remove((int) eProperty.MaxSpeed, this);
+            Owner.OnMaxSpeedChange();
+        }
+
+        public override bool FinalizeState(EffectListComponent.AddEffectResult result)
+        {
+            // Movement speed buffs are always disabled when applied to a stealthed target.
+            if (EffectType is eEffect.MovementSpeedBuff && result is EffectListComponent.AddEffectResult.Added && Owner.IsStealthed)
+                return base.FinalizeState(EffectListComponent.AddEffectResult.Disabled);
+            else
+                return base.FinalizeState(result);
+        }
+    }
+}

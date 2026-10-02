@@ -1,0 +1,24 @@
+﻿# Blacksmith NPC
+
+## Examine
+GameNPC.Blacksmith.YouTarget:				    You target [{0}].
+GameNPC.Blacksmith.YouExamine:				    You examine {0}. {1} is {2} and is a smith.
+GameNPC.Blacksmith.GiveObject:				    [Give {0} an item to be repaired]
+
+## Accept/Decline Repair
+GameNPC.Blacksmith.Say:					        {0} says, "I can repair weapons or armor for you. Just hand me the item you want repaired and I'll see what I can do, for a small fee."
+GameNPC.Blacksmith.RepairCostAccept:			It will cost {0} to repair {1}. Do you accept?
+GameNPC.Blacksmith.YouPay:				        You pay {0} {1}.
+GameNPC.Blacksmith.AbortRepair:				    You decline to have your {0} repaired.
+
+## Returns
+GameNPC.Blacksmith.CantRepairThat:			    {0} says, "I can't repair that."
+GameNPC.Blacksmith.StackedObjets:			    {0} doesn't want stacked items.
+GameNPC.Blacksmith.NoNeedRepair:			    Your {0} is already in perfect condition.
+GameNPC.Blacksmith.NotEnoughMoney:			    {0} says, "It costs {1} to repair {2}. You don't have that much."
+GameNPC.Blacksmith.ObjectRatherOld:			    {0} says, "Uhh, {1} is rather old. I won't be able to repair it again, so be careful!"
+GameNPC.Blacksmith.ItsDone:				        {0} says, "There, {1} is ready for combat."
+
+## Not Used
+GameNPC.Blacksmith.InvalidItem:				    Invalid item.
+GameNPC.Blacksmith.ObjectCantRepaired:			This object can't be repaired.

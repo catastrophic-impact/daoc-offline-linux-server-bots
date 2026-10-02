@@ -1,0 +1,34 @@
+﻿# Effects
+GamePlayer.Spell.Proc.NotImplemented:		Reactive effect ID {0} is not implemented yet on this server.
+
+## Interact
+Effects.GameSpellEffect.CantRemoveEffect:		You can't remove this effect!
+Effects.StaticEffect.YouCantRemoveThisEffect:	You can't remove this effect!
+Effects.CantRemoveThis:	                        You can't remove this effect!
+SpellHandler.CancelEffect:	                    You cancel your effect.
+
+## Delve Information
+Effects.DelveInfo.MinutesRemaining:				- {0}: {1} minutes remaining.
+Effects.DelveInfo.SecondsRemaining:				- {0} seconds remaining.
+Effects.DelveInfo.Seconds:				{0} seconds.
+Effects.CantRemoveThis:	You can't remove this effect!
+
+## Amnesia
+Amnesia.MessageToTarget:	Your mind goes blank and you forget what you were doing!
+Amnesia.MessageToArea:      {0} forgets what they were doing!
+
+## Misc
+Effects.BannerOfWardingEffect.Name:				Banner of Warding
+Effects.BannerOfWardingEffect.Description:		Grants a 10% bonus to all magical resists.
+Effects.BannerOfShieldingEffect.Name			Banner of Shielding
+Effects.BannerOfShieldingEffect.Description:	Grants a 6% bonus to all melee resists.
+Effects.BannerOfFreedomEffect.Name				Banner of Freedom
+Effects.BannerOfFreedomEffect.Description:		Reduces all Crowd Controls by 6%.
+Effects.BannerOfBesiegingEffect.Name:			Banner of Besieging
+Effects.BannerOfBesiegingEffect.Description:	Reduces the fireing speed of siegeweapons by 6%.
+
+## Volley
+Effects.VolleyEffect.MBHitsExtraDamage:   You shoot {0} with your bow and hit for {1} damage!
+Effects.VolleyEffect.MBHitsExtraDamageCrit:   You critical hit {0} for an additional {1} damage! 
+Effects.VolleyEffect.XMBExtraDamageToYou:  {0} hits your {1} for {2} damage!
+Effects.VolleyEffect.XMBExtraDamageToYouCrit:  {0} critical hits you for an additional {1} damage!

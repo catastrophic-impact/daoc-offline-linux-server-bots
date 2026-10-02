@@ -1,0 +1,24 @@
+<Project>
+    <PropertyGroup>
+        <BaseIntermediateOutputPath>..\build\DaocAdmin\$(Configuration)\</BaseIntermediateOutputPath>
+    </PropertyGroup>
+    <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+    <!-- daoc-admin: terminal GUI (no arguments) and CLI (with arguments) for a running server. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <Nullable>enable</Nullable>
+        <AssemblyName>DaocAdmin</AssemblyName>
+        <RootNamespace>DaocServer.Admin.Tool</RootNamespace>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <IntermediateOutputPath>..\build\DaocAdmin\$(Configuration)\obj\</IntermediateOutputPath>
+        <OutputPath>..\$(Configuration)\</OutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- Pinned. Bundled into the self-contained release, so it cannot change underneath us. -->
+        <PackageReference Include="Terminal.Gui" Version="1.19.0" />
+        <ProjectReference Include="..\Admin.Protocol\Admin.Protocol.csproj" />
+    </ItemGroup>
+    <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

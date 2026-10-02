@@ -1,0 +1,46 @@
+﻿<Project>
+    <PropertyGroup>
+        <BaseIntermediateOutputPath>..\build\CoreDatabase\$(Configuration)\</BaseIntermediateOutputPath>
+        <PackageId>CoreDatabase</PackageId>
+        <RootNamespace>Core.Database</RootNamespace>
+    </PropertyGroup>
+    <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <OutputType>Library</OutputType>
+        <RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
+        <OutputPath>..\$(Configuration)\lib\</OutputPath>
+        <IntermediateOutputPath>..\build\CoreDatabase\$(Configuration)\obj\</IntermediateOutputPath>
+        <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+        <Deterministic>false</Deterministic>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <InvariantGlobalization>false</InvariantGlobalization>
+        <RegisterForComInterop>false</RegisterForComInterop>
+        <AssemblyTitle>OpenDAoC - CoreDatabase</AssemblyTitle>
+        <AssemblyDescription>Database framework</AssemblyDescription>
+        <AssemblyCompany>OpenDAoC Development Team</AssemblyCompany>
+        <AssemblyProduct>DAoC Server Side Emulation Package - OpenDAoC</AssemblyProduct>
+        <AssemblyCopyright>OpenDAoC Development Team</AssemblyCopyright>
+        <AssemblyTrademark>OpenDAoC Development Team</AssemblyTrademark>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <DefineConstants>DEBUG;TRACE</DefineConstants>
+        <Optimize>false</Optimize>
+        <DebugType>full</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <DefineConstants>TRACE</DefineConstants>
+        <Optimize>true</Optimize>
+        <DebugType>full</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\CoreBase\CoreBase.csproj" />
+        <PackageReference Include="MySqlConnector" Version="2.5.0" />
+        <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
+    </ItemGroup>
+    <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

@@ -1,0 +1,24 @@
+using DOL.GS.Effects;
+
+namespace DOL.GS.Spells
+{
+    /// <summary>
+    /// Spell handler for Facilitate Painworking.
+    /// </summary>
+    /// <author>Aredhel</author>
+    [SpellHandler(eSpellType.FacilitatePainworking)]
+    class FacilitatePainworking : SpellHandler
+    {
+        public FacilitatePainworking(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
+
+        public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
+        {
+            return ECSGameEffectFactory.Create(initParams, static (in i) => new FacilitatePainworkingECSGameEffect(i));
+        }
+
+        protected override GameSpellEffect CreateSpellEffect(GameLiving target, double effectiveness)
+        {
+            return new FacilitatePainworkingEffect(this, CalculateEffectDuration(target), 0, effectiveness);
+        }
+    }
+}

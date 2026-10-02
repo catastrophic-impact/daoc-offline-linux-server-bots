@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- Builds the SQLite world: upstream OpenDAoC-Database dump -> schema from this server's own
+         DataObjects -> rows -> world/patches (the Classic + SI world of Offline DAoC 0.33). -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <AssemblyName>DaocWorldBuilder</AssemblyName>
+        <RootNamespace>Daoc.WorldBuilder</RootNamespace>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\GameServer\GameServer.csproj" />
+        <None Include="..\GameServer\config\logconfig.xml" Link="logconfig.xml" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+</Project>

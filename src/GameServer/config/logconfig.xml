@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" throwConfigExceptions="true" throwExceptions="true">
+	<variable name="logDirectory" value="./logs" />
+
+	<targets>
+		<!-- Console -->
+		<target name="console" xsi:type="ColoredConsole"
+			layout="${date:format=HH\:mm\:ss} | ${level:uppercase=true:format=TriLetter} | ${logger} | ${message}${onexception:${newline}${exception:format=tostring}">
+				<highlight-row foregroundColor="Gray" condition="level == LogLevel.Trace" />
+				<highlight-row foregroundColor="Blue" condition="level == LogLevel.Debug" />
+				<highlight-row foregroundColor="White" condition="level == LogLevel.Info" />
+				<highlight-row foregroundColor="Yellow" condition="level == LogLevel.Warn" />
+				<highlight-row foregroundColor="Red" condition="level == LogLevel.Error" />
+				<highlight-row foregroundColor="DarkRed" condition="level == LogLevel.Fatal" />
+				<highlight-row foregroundColor="Magenta" condition="level == LogLevel.Off" />
+		</target>
+
+		<!-- Log Files -->
+		<target name="gameServerFile" xsi:type="File"
+			layout="${date:format=MM/dd HH\:mm\:ss} | ${level:uppercase=true:format=TriLetter} | ${logger} | ${message}${onexception:${newline}${exception:format=tostring}}"
+			fileName="${logDirectory}/server.log"
+			keepFileOpen="true"
+			archiveFileName="${logDirectory}/server.log"
+			archiveSuffixFormat=".{1:yyyy-MM-dd}.{0:0}"
+			archiveAboveSize="104857600"
+			archiveEvery="Day"
+			maxArchiveDays="7" />
+		<target name="warnFile" xsi:type="File"
+			layout="${date:format=MM/dd HH\:mm\:ss} | ${logger} | ${message}${onexception:${newline}${exception:format=tostring}}"
+			fileName="${logDirectory}/warn.log"
+			keepFileOpen="true"
+			archiveFileName="${logDirectory}/warn.log"
+			archiveSuffixFormat=".{1:yyyy-MM-dd}.{0:0}"
+			archiveAboveSize="104857600"
+			archiveEvery="Day"
+			maxArchiveDays="7" />
+		<target name="errorFile" xsi:type="File"
+			layout="${date:format=MM/dd HH\:mm\:ss} | ${logger} | ${message}${onexception:${newline}${exception:format=tostring}}"
+			fileName="${logDirectory}/error.log"
+			keepFileOpen="true"
+			archiveFileName="${logDirectory}/error.log"
+			archiveSuffixFormat=".{1:yyyy-MM-dd}.{0:0}"
+			archiveAboveSize="104857600"
+			archiveEvery="Day"
+			maxArchiveDays="7" />
+		<target name="gmActionFile" xsi:type="File"
+			layout="${date:format=MM/dd HH\:mm\:ss} | ${message}"
+			fileName="${logDirectory}/gm-action.log"
+			keepFileOpen="true"
+			archiveFileName="${logDirectory}/gm-action.log"
+			archiveSuffixFormat=".{1:yyyy-MM-dd}.{0:0}"
+			archiveAboveSize="104857600"
+			archiveEvery="Day" />
+		<target name="cheatFile" xsi:type="File"
+			layout="${date:format=MM/dd HH\:mm\:ss} | ${message}"
+			fileName="${logDirectory}/cheat.log"
+			keepFileOpen="true"
+			archiveFileName="${logDirectory}/cheat.log"
+			archiveSuffixFormat=".{1:yyyy-MM-dd}.{0:0}"
+			archiveAboveSize="104857600"
+			archiveEvery="Day" />
+		<target name="dualIpFile" xsi:type="File"
+			layout="${date:format=MM/dd HH\:mm\:ss} | ${message}"
+			fileName="${logDirectory}/dual-ip.log"
+			keepFileOpen="true"
+			archiveFileName="${logDirectory}/dual-ip.log"
+			archiveSuffixFormat=".{1:yyyy-MM-dd}.{0:0}"
+			archiveAboveSize="104857600"
+			archiveEvery="Day" />
+		<target name="inventoryFile" xsi:type="File"
+			layout="${date:format=MM/dd HH\:mm\:ss} | ${message}"
+			fileName="${logDirectory}/inventory.log"
+			keepFileOpen="true"
+			archiveFileName="${logDirectory}/inventory.log"
+			archiveSuffixFormat=".{1:yyyy-MM-dd}.{0:0}"
+			archiveAboveSize="104857600"
+			archiveEvery="Day" />
+	</targets>
+
+	<rules>
+		<!-- Special Loggers -->
+		<logger name="gmactions"
+			minLevel="Trace"
+			writeTo="gmActionFile"
+			final="true" />
+		<logger name="cheats"
+			minLevel="Trace"
+			writeTo="cheatFile"
+			final="true" />
+		<logger name="dualip"
+			minLevel="Trace"
+			writeTo="dualIpFile"
+			final="true" />
+		<logger name="inventories"
+			minLevel="Trace"
+			writeTo="inventoryFile"
+			final="true" />
+
+		<!-- Filters -->
+		<logger name="DOL.GS.PacketHandler.PacketProcessor"
+			maxlevel="Info"
+			final="true" />
+		<logger name="DOL.Database.ObjectDatabase"
+			maxlevel="Info"
+			final="true" />
+		<logger name="DOL.Database.Handlers"
+			maxlevel="Info"
+			final="true" />
+		<logger name="DOL.GS.Zone"
+			maxlevel="Info"
+			final="true" />
+		<logger name="DOL.GS.GameTimer"
+			maxlevel="Debug"
+			final="true" />
+
+		<!-- Global Loggers -->
+		<logger name="*"
+			minLevel="Debug"
+			writeTo="console" />
+		<logger name="*"
+			minLevel="Debug"
+			writeTo="gameServerFile" />
+		<logger name="*"
+			level="Warn"
+			writeTo="warnFile" />
+		<logger name="*"
+			level="Error"
+			writeTo="errorFile" />
+	</rules>
+</nlog>

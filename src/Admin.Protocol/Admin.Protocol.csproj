@@ -1,0 +1,17 @@
+<Project>
+    <PropertyGroup>
+        <BaseIntermediateOutputPath>..\build\Admin.Protocol\$(Configuration)\</BaseIntermediateOutputPath>
+    </PropertyGroup>
+    <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+    <!-- Shared by the server (AdminService) and the daoc-admin TUI/CLI. No server dependencies. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Library</OutputType>
+        <Nullable>enable</Nullable>
+        <RootNamespace>DaocServer.Admin</RootNamespace>
+        <IntermediateOutputPath>..\build\Admin.Protocol\$(Configuration)\obj\</IntermediateOutputPath>
+        <OutputPath>..\$(Configuration)\lib\</OutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+    <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

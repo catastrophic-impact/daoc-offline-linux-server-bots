@@ -1,0 +1,42 @@
+﻿<Project>
+    <PropertyGroup>
+        <BaseIntermediateOutputPath>..\build\CoreBase\$(Configuration)\</BaseIntermediateOutputPath>
+        <PackageId>CoreBase</PackageId>
+        <RootNamespace>Core.Base</RootNamespace>
+    </PropertyGroup>
+    <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <OutputType>Library</OutputType>
+        <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+        <IntermediateOutputPath>..\build\CoreBase\$(Configuration)\obj\</IntermediateOutputPath>
+        <OutputPath>..\$(Configuration)\lib\</OutputPath>
+        <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+        <Deterministic>false</Deterministic>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <RegisterForComInterop>false</RegisterForComInterop>
+        <AssemblyTitle>OpenDAoC - CoreBase</AssemblyTitle>
+        <AssemblyDescription>Base code for OpenDAoC server</AssemblyDescription>
+        <AssemblyCompany>OpenDAoC Development Team</AssemblyCompany>
+        <AssemblyProduct>DAoC Server Side Emulation Package - OpenDAoC</AssemblyProduct>
+        <AssemblyCopyright>OpenDAoC Development Team</AssemblyCopyright>
+        <AssemblyTrademark>OpenDAoC Development Team</AssemblyTrademark>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <Optimize>false</Optimize>
+        <DebugType>full</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <Optimize>true</Optimize>
+        <DebugType>full</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="NLog" Version="6.1.0" />
+        <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    </ItemGroup>
+    <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

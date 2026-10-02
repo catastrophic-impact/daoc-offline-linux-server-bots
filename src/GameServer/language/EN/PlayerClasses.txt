@@ -1,0 +1,117 @@
+﻿# Player Classes
+
+## Class Professions
+
+### Albion
+PlayerClass.Profession.Academy:			    Academy
+PlayerClass.Profession.ChurchofAlbion:		Church of Albion
+PlayerClass.Profession.DefendersofAlbion:	Defenders of Albion
+PlayerClass.Profession.GuildofShadows:		Guild of Shadows
+PlayerClass.Profession.TempleofArawn:		Temple of Arawn
+
+### Hibernia
+PlayerClass.Profession.PathofAffinity:		Path of Affinity
+PlayerClass.Profession.PathofEssence:		Path of Essence
+PlayerClass.Profession.PathofFocus:		    Path of Focus
+PlayerClass.Profession.PathofHarmony:		Path of Harmony
+
+### Midgard
+PlayerClass.Profession.HouseofBodgar:		House of Bodgar
+PlayerClass.Profession.HouseofBragi:		House of Bragi
+PlayerClass.Profession.HouseofEir:		    House of Eir
+PlayerClass.Profession.HouseofHel:		    House of Hel
+PlayerClass.Profession.HouseofKelgor:		House of Kelgor
+PlayerClass.Profession.Loki:			    House of Loki
+PlayerClass.Profession.HouseofModi:		    House of Modi
+PlayerClass.Profession.HouseofOdin:		    House of Odin
+PlayerClass.Profession.HouseofSkadi:		House of Skadi
+PlayerClass.Profession.HouseofThor:		    House of Thor
+PlayerClass.Profession.HouseofTyr:		    House of Tyr
+PlayerClass.Profession.HouseofYmir:		    House of Ymir
+
+### Mauler
+PlayerClass.Profession.TempleofIronFist:	Temple of the Iron Fist
+
+## Classes
+
+### Albion
+#### Base
+PlayerClass.Name.Acolyte:			        Acolyte
+PlayerClass.Name.Disciple:			        Disciple
+PlayerClass.Name.Elementalist:			    Elementalist
+PlayerClass.Name.Fighter:			        Fighter
+PlayerClass.Name.Mage:				        Mage
+PlayerClass.Name.AlbionRogue:			    Rogue
+
+#### Advanced
+PlayerClass.Name.Armsman:			        Armsman
+PlayerClass.Name.Cabalist:			        Cabalist
+PlayerClass.Name.Cleric:			        Cleric
+PlayerClass.Name.Friar:				        Friar
+PlayerClass.Name.Heretic:			        Heretic
+PlayerClass.Name.Infiltrator:			    Infiltrator
+PlayerClass.Name.Mauler_Alb:			    Mauler
+PlayerClass.Name.Mercenary:			        Mercenary
+PlayerClass.Name.Minstrel:			        Minstrel
+PlayerClass.Name.Necromancer:			    Necromancer
+PlayerClass.Name.Paladin:			        Paladin
+PlayerClass.Name.Reaver:			        Reaver
+PlayerClass.Name.Scout:				        Scout
+PlayerClass.Name.Sorcerer:			        Sorcerer
+PlayerClass.Name.Theurgist:			        Theurgist
+PlayerClass.Name.Wizard:			        Wizard
+
+### Hibernia
+#### Base
+PlayerClass.Name.Forester:			        Forester
+PlayerClass.Name.Guardian:			        Guardian
+PlayerClass.Name.Magician:			        Magician
+PlayerClass.Name.Naturalist:			    Naturalist
+PlayerClass.Name.Stalker:			        Stalker
+
+#### Advanced
+PlayerClass.Name.Animist:			        Animist
+PlayerClass.Name.Bainshee:			        Bainshee
+PlayerClass.Name.Bard:				        Bard
+PlayerClass.Name.Blademaster:			    Blademaster
+PlayerClass.Name.Champion:			        Champion
+PlayerClass.Name.Druid:				        Druid
+PlayerClass.Name.Eldritch:			        Eldritch
+PlayerClass.Name.Enchanter:			        Enchanter
+PlayerClass.Name.Hero:				        Hero
+PlayerClass.Name.Mauler_Hib:			    Mauler
+PlayerClass.Name.Mentalist:			        Mentalist
+PlayerClass.Name.Nightshade:			    Nightshade
+PlayerClass.Name.Ranger:			        Ranger
+PlayerClass.Name.Valewalker:			    Valewalker
+PlayerClass.Name.Vampiir:			        Vampiir
+PlayerClass.Name.Warden:			        Warden
+PlayerClass.Name.Sluaghbinder:              Sluaghbinder
+
+### Midgard
+#### Base
+PlayerClass.Name.Mystic:			        Mystic
+PlayerClass.Name.MidgardRogue:			    Rogue
+PlayerClass.Name.Seer:				        Seer
+PlayerClass.Name.Viking:			        Viking
+
+#### Advanced
+PlayerClass.Name.Berserker:			        Berserker
+PlayerClass.Name.Bonedancer:			    Bonedancer
+PlayerClass.Name.Healer:			        Healer
+PlayerClass.Name.Hunter:			        Hunter
+PlayerClass.Name.Mauler_Mid:			    Mauler
+PlayerClass.Name.Runemaster:			    Runemaster
+PlayerClass.Name.Savage:			        Savage
+PlayerClass.Name.Shadowblade:			    Shadowblade
+PlayerClass.Name.Shaman:			        Shaman
+PlayerClass.Name.Skald:				        Skald
+PlayerClass.Name.Spiritmaster:			    Spiritmaster
+PlayerClass.Name.Thane:				        Thane
+PlayerClass.Name.Valkyrie:			        Valkyrie
+PlayerClass.Name.Warlock:			        Warlock
+PlayerClass.Name.Warrior:			        Warrior
+
+## Autotraining
+PlayerClass.OnLevelUp.Autotrain:		    You can now train {0} to level {1} for free.
+

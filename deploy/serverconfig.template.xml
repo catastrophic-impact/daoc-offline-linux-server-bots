@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+    <Server>
+        <!-- Paths are relative to bin/, so the whole folder can be moved. -->
+        <!-- Listen on every interface so LAN (and port-forwarded) clients can connect. -->
+        <Port>10300</Port>
+        <IP>0.0.0.0</IP>
+        <!-- The address clients are told to use. 127.0.0.1 only works for a client on this machine;
+             for LAN play set it to this machine's LAN address (e.g. 192.168.1.20). -->
+        <RegionIP>127.0.0.1</RegionIP>
+        <RegionPort>10400</RegionPort>
+        <UdpIP>0.0.0.0</UdpIP>
+        <UdpPort>10400</UdpPort>
+        <EnableUPnP>False</EnableUPnP>
+        <DetectRegionIP>False</DetectRegionIP>
+        <ServerName>DAoC Server</ServerName>
+        <ServerNameShort>DAoCServer</ServerNameShort>
+        <LogConfigFile>./config/logconfig.xml</LogConfigFile>
+        <ScriptCompilationTarget>./lib/GameServerScripts.dll</ScriptCompilationTarget>
+        <ScriptAssemblies> </ScriptAssemblies>
+        <EnableCompilation>True</EnableCompilation>
+        <!-- Until the admin CLI exists (Phase 2), accounts are created on first login. -->
+        <AutoAccountCreation>True</AutoAccountCreation>
+        <GameType>Normal</GameType>
+        <CheatLoggerName>cheats</CheatLoggerName>
+        <GMActionLoggerName>gmactions</GMActionLoggerName>
+        <InvalidNamesFile>./config/invalidnames.txt</InvalidNamesFile>
+        <DBType>SQLITE</DBType>
+        <DBConnectionString>Data Source=../data/opendaoc.sqlite3.db;Version=3;Pooling=True;Journal Mode=WAL;Synchronous=Normal;Foreign Keys=True;Default Timeout=60</DBConnectionString>
+        <DBAutosave>True</DBAutosave>
+        <DBAutosaveInterval>10</DBAutosaveInterval>
+        <MetricsEnabled>false</MetricsEnabled>
+        <MetricsInterval>60s</MetricsInterval>
+        <OtlpEndpoint>http://127.0.0.1:4317</OtlpEndpoint>
+    </Server>
+</root>

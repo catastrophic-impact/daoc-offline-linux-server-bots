@@ -1,0 +1,135 @@
+using System;
+using System.Collections.Generic;
+using DOL.Language;
+using DOL.Logging;
+
+namespace DOL.GS.Spells
+{
+	/// <summary>
+	/// Damages the target and lowers their resistance to the spell's type.
+	/// </summary>
+	[SpellHandler(eSpellType.DirectDamageWithDebuff)]
+	public class DirectDamageDebuffSpellHandler : AbstractResistDebuff
+	{
+		private static readonly Logger log = LoggerManager.Create(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+		public override string ShortDescription => $"Inflicts {Spell.Damage} {PropertyToString(Property1)} damage to the target and decreases its resistance by {Spell.Value}%.";
+		public override eProperty Property1 => GameLiving.GetResistTypeForDamage(Spell.DamageType);
+		public override string DebuffTypeName => GlobalConstants.DamageTypeToName(Spell.DamageType);
+		protected override bool IsDualComponentSpell => true;
+
+		public DirectDamageDebuffSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) {}
+
+		public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
+		{
+			return ECSGameEffectFactory.Create(initParams, static (in i) => new StatDebuffECSEffect(i));
+		}
+
+		public override void OnDirectEffect(GameLiving target)
+		{
+			if (target == null)
+				return;
+
+			if (Spell.Target is eSpellTarget.CONE || (Spell.Target is eSpellTarget.ENEMY && Spell.IsPBAoE))
+			{
+				if (!Caster.castingComponent.StartEndOfCastLosCheck(target, this))
+					DealDamage(target);
+			}
+			else
+				DealDamage(target);
+		}
+
+		public override void ApplyEffectOnTarget(GameLiving target)
+		{
+			base.ApplyEffectOnTarget(target);
+
+			if ((Spell.Duration > 0 && Spell.Target is not eSpellTarget.AREA) || Spell.Concentration > 0)
+				OnDirectEffect(target);
+		}
+
+		public override void OnEndOfCastLosCheck(GameLiving target, LosCheckResponse response)
+		{
+			if (response is LosCheckResponse.True)
+				DealDamage(target);
+		}
+
+		private void DealDamage(GameLiving target)
+		{
+			if (!target.IsAlive || target.ObjectState is not GameObject.eObjectState.Active)
+				return;
+
+			// calc damage
+			AttackData ad = CalculateDamageToTarget(target);
+			SendDamageMessages(ad);
+			DamageTarget(ad, true);
+			target.StartInterruptTimer(target.SpellInterruptDuration, ad.AttackType, Caster);
+			/*
+			if (target.IsAlive)
+				base.ApplyEffectOnTarget(target, effectiveness);*/
+		}
+
+		/// <summary>
+		/// Delve Info
+		/// </summary>
+		public override IList<string> DelveInfo
+		{
+			get
+			{
+				/*
+				<Begin Info: Lesser Raven Bolt>
+				Function: dmg w/resist decrease
+ 
+				Damages the target, and lowers the target's resistance to that spell type.
+ 
+				Damage: 32
+				Resist decrease (Cold): 10%
+				Target: Targetted
+				Range: 1500
+				Duration: 1:0 min
+				Power cost: 5
+				Casting time:      3.0 sec
+				Damage: Cold
+ 
+				<End Info>
+				*/
+
+				var list = new List<string>();
+
+                list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DirectDamageDebuffSpellHandler.DelveInfo.Function"));
+				list.Add(" "); //empty line
+				list.Add(ShortDescription);
+				list.Add(" "); //empty line
+                if (Spell.Damage != 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Damage", Spell.Damage.ToString("0.###;0.###'%'")));
+                if (Spell.Value != 0)
+                    list.Add(String.Format(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DirectDamageDebuffSpellHandler.DelveInfo.Decrease", DebuffTypeName, Spell.Value)));
+                list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Target", Spell.Target));
+                if (Spell.Range != 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Range", Spell.Range));
+                if (Spell.Duration >= ushort.MaxValue * 1000)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Duration") + " Permanent.");
+                else if (Spell.Duration > 60000)
+                    list.Add(string.Format(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Duration") + Spell.Duration / 60000 + ":" + (Spell.Duration % 60000 / 1000).ToString("00") + " min"));
+                else if (Spell.Duration != 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Duration") + (Spell.Duration / 1000).ToString("0' sec';'Permanent.';'Permanent.'"));
+                if (Spell.Frequency != 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Frequency", (Spell.Frequency * 0.001).ToString("0.0")));
+                if (Spell.Power != 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.PowerCost", Spell.Power.ToString("0;0'%'")));
+                list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.CastingTime", (Spell.CastTime * 0.001).ToString("0.0## sec;-0.0## sec;'instant'")));
+				if(Spell.RecastDelay > 60000)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.RecastTime") + (Spell.RecastDelay/60000).ToString() + ":" + (Spell.RecastDelay%60000/1000).ToString("00") + " min");
+				else if(Spell.RecastDelay > 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.RecastTime") + (Spell.RecastDelay/1000).ToString() + " sec");
+   				if(Spell.Concentration != 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.ConcentrationCost", Spell.Concentration));
+				if(Spell.Radius != 0)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Radius", Spell.Radius));
+				if(Spell.DamageType != eDamageType.Natural)
+                    list.Add(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Damage", GlobalConstants.DamageTypeToName(Spell.DamageType)));
+
+				return list;
+			}
+		}
+	}
+}

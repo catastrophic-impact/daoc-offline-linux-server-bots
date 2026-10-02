@@ -1,0 +1,1201 @@
+{
+  "schemaVersion": 1,
+  "baselineCombatRows": 2460,
+  "raidEventRows": 85,
+  "ordinaryCombatRows": 2375,
+  "rows": [
+    {
+      "id": "003e4cca-8dc2-49d4-a828-49e476a5e93b",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45783,
+        50001,
+        20855
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "081efef5-3185-4249-be4a-d3a7dd984ad1",
+      "name": "Duke Bimure",
+      "level": 75,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        44108,
+        30160,
+        16151
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "09b69123-e400-4310-ba7c-c3440dd2aea3",
+      "name": "Chamberlain",
+      "level": 79,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45546,
+        51300,
+        15469
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "0a29ac41-bdf6-4977-9a58-126785707f89",
+      "name": "Marquis Focalleste",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        48320,
+        31057,
+        16152
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "100033970",
+      "name": "Earl Zh'alzhak",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        35526,
+        41149,
+        14957
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "100033973",
+      "name": "Chthonic Knight Zagal",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        16960,
+        17369,
+        17774
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "100033989",
+      "name": "Inquisitor Bor",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        37800,
+        11011,
+        15333
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "100033994",
+      "name": "Chthonic Knight Gaapoler",
+      "level": 72,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        24471,
+        18560,
+        17529
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "100033997",
+      "name": "Earl Mermer",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        38191,
+        16117,
+        16047
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "100034008",
+      "name": "Marquis Almen",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        49267,
+        39141,
+        15854
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "100034009",
+      "name": "Inquisitor Zaviben",
+      "level": 72,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        35843,
+        16317,
+        16045
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "10953e5f-4018-41b3-aee8-39fd9dddfee1",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45351,
+        49706,
+        20833
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "1247aa3a-8a56-443a-8b17-23c4fa93f94e",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        43648,
+        49246,
+        20862
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "159c59e0-9d11-43ba-af0c-95d9b9fa4980",
+      "name": "Chthonic Knight Carabia",
+      "level": 65,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        44241,
+        47856,
+        15342
+      ],
+      "reasons": [
+        "chthonic_wing"
+      ]
+    },
+    {
+      "id": "15eeaebb-29e9-42ec-8a77-edf7ef238cbe",
+      "name": "Prince Abdin",
+      "level": 78,
+      "classType": "DOL.GS.PrinceAbdin",
+      "spawn": [
+        25647,
+        17946,
+        17684
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "178e4ebf-6d7e-4f89-a77d-fa6159bd4eac",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        43056,
+        49276,
+        20870
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "1c91b1d9-d5c2-4912-abf8-421227e907a6",
+      "name": "Mutilator Vorazax",
+      "level": 72,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        24984,
+        32826,
+        16088
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "1d81bff6-c6e1-4033-b3b3-a465208e0537",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        44913,
+        49545,
+        20833
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "1f492340-dfc5-4ef3-8114-4a6444c4ba8d",
+      "name": "Duke Aypol",
+      "level": 75,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        37099,
+        41305,
+        15316
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "210007c9-4d15-48b3-85b3-737ce0e09c07",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        44565,
+        49185,
+        20857
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "229fd2b1-b8c7-463f-bc27-1b7bb4915a00",
+      "name": "Inquisitor Haap",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        37699,
+        16350,
+        16045
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "22b28cbb-af10-465c-b577-838317ac3f1e",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45055,
+        50045,
+        20866
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "25356e98-83c9-4a5d-a2b1-8706d1bc19ae",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        42989,
+        48652,
+        21004
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "27699d66-882a-4b45-92c7-bd212a7d983f",
+      "name": "Earl Oraxus",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        48620,
+        37458,
+        15684
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "2c8dae21-5f1a-4d93-b197-c7a994a547fc",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        46617,
+        50041,
+        20867
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "2dacfecd-b74d-4f48-96e2-e5b87075c070",
+      "name": "Chthonic Knight Fonath",
+      "level": 74,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45823,
+        47875,
+        15342
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "2f2f0334-f409-4ef3-905d-b81f57a546d2",
+      "name": "Mutilator Vozoaz",
+      "level": 72,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        22894,
+        30120,
+        15916
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "333b2af5-a705-43f6-b200-119fb1a98a4b",
+      "name": "High Lord Oro",
+      "level": 68,
+      "classType": "DOL.GS.HighLordOroClone",
+      "spawn": [
+        44848,
+        25414,
+        15860
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "3676f000-99ef-46c7-a126-d05de228f678",
+      "name": "Mutilator Konapher",
+      "level": 74,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        43168,
+        49927,
+        15461
+      ],
+      "reasons": [
+        "chthonic_wing",
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "39d8053e-5b99-4cf6-b7b2-b6f3dbebce29",
+      "name": "High Lord Baelerdoth",
+      "level": 80,
+      "classType": "DOL.GS.HighLordBaelerdoth",
+      "spawn": [
+        49208,
+        31993,
+        15982
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "3b025f42-62a9-479c-b0c0-c67efd3cedbb",
+      "name": "Duke Satori",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45039,
+        41626,
+        15586
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "4552e0a1-132c-4f06-89b8-2fe3406514de",
+      "name": "High Lord Saeor",
+      "level": 70,
+      "classType": "DOL.GS.HighLordSaeor",
+      "spawn": [
+        49971,
+        38134,
+        15969
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "485cfb06-ea41-4d41-a6ea-80ff86b8f165",
+      "name": "Inquisitor Zazinol",
+      "level": 72,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        38250,
+        15672,
+        16045
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "4ddd11e8-0d15-4312-aad8-b628a9302a5a",
+      "name": "Mutilator Ezerak",
+      "level": 65,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        43149,
+        48635,
+        15461
+      ],
+      "reasons": [
+        "chthonic_wing"
+      ]
+    },
+    {
+      "id": "504d573f-deab-4cb2-9dbc-d9d053d7af2f",
+      "name": "High Lord Oro",
+      "level": 67,
+      "allowedLevels": [65, 66, 67, 68, 69, 70],
+      "classType": "DOL.GS.HighLordOro",
+      "spawn": [
+        45048,
+        25015,
+        15967
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "50aae85d-17be-40ff-9f86-4868e4896b4c",
+      "name": "Earl Ipostian",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        24010,
+        32212,
+        15984
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "553b286f-bb1e-4ccd-84ce-827f41a3332e",
+      "name": "Prince Ba'alorien",
+      "level": 78,
+      "classType": "DOL.GS.PrinceBaalorien",
+      "spawn": [
+        36680,
+        16197,
+        16051
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "5d00641d-255d-41ef-bdc4-51d7c2006f1b",
+      "name": "Mutilator Yooginroth",
+      "level": 72,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        24161,
+        30634,
+        15916
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "6454eed0-b774-413c-8313-25a125d4c194",
+      "name": "Marquis Valupa",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        46232,
+        42748,
+        15586
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "6503df94-6304-4e22-80a1-028b4fcbf89d",
+      "name": "Inquisitor Famuel",
+      "level": 74,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45952,
+        49931,
+        15340
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "6658d64d-f391-42ab-a407-9f474eefa425",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        43290,
+        49071,
+        20877
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "68ada095-96e1-4fd6-b41e-eccb0937a069",
+      "name": "Chthonic Knight Haag",
+      "level": 72,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        24077,
+        17614,
+        17458
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "6edd37e3-cef6-4548-94b5-7f1726457755",
+      "name": "Marquis Chaosmar",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        35330,
+        41862,
+        15073
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "752d73b7-a23c-4da1-a54d-83cc72e06fda",
+      "name": "Earl Amagin",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        44207,
+        49911,
+        15341
+      ],
+      "reasons": [
+        "chthonic_wing",
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "78054008-b60c-4d09-bf17-7598f98fab52",
+      "name": "Mutilator Xagalith",
+      "level": 77,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        17630,
+        32400,
+        16010
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "7ad4a2f6-319b-4743-a175-06025e45c9ba",
+      "name": "Chthonic Knight Absax",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        15888,
+        19199,
+        17772
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "7d5dfe98-0c89-4cd4-98de-753cd2fa3451",
+      "name": "Marquis Sabonach",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        46087,
+        25688,
+        15845
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "7ff6878c-718a-4d12-8615-5512b40c7762",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        43749,
+        49583,
+        20833
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "82c29641-bf1e-437d-a908-7fd554cfbe1c",
+      "name": "Marquis Dortaleon",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        41059,
+        40452,
+        15493
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "8b550e8d-c8b8-4a17-9797-ae9acac37184",
+      "name": "Mutilator Xazbalor",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        23358,
+        33487,
+        15916
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "8dc92cc6-b595-44db-b318-08e16cd15ff7",
+      "name": "Duke Alloc",
+      "level": 75,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        34166,
+        40730,
+        15073
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "93d831a5-489e-4a59-b3a8-60a51e63f61f",
+      "name": "Marquis Chaosmar",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        46964,
+        48641,
+        15461
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "948ef144-cc03-470b-988e-7fec37056af1",
+      "name": "Behemoth",
+      "level": 99,
+      "classType": "DOL.GS.Behemoth",
+      "spawn": [
+        44490,
+        49588,
+        20833
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "9642dded-cdba-4a7b-99df-9ba010fd7cab",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        42797,
+        50030,
+        20862
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "9902c484-5154-4c11-b25d-61a8c449cb94",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        43671,
+        49988,
+        20860
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "9d58f76f-ac4b-4681-b576-fe674d2cb61c",
+      "name": "Legion",
+      "level": 83,
+      "classType": "DOL.GS.Scripts.Legion",
+      "spawn": [
+        45027,
+        51899,
+        15468
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "9f0042f1-dda5-46f9-b875-af72e6429d2f",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        43109,
+        50070,
+        20867
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "a34c9cc8-07d7-495a-929f-ebb000dfdf64",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        42749,
+        49135,
+        20879
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "a7bdfd24-30cc-4fd6-a432-2343f2042e28",
+      "name": "Chthonic Knight Azea",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        19209,
+        17855,
+        17260
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "a8f409ff-c50c-4149-b3c2-ee1b19fd93a0",
+      "name": "chaosian",
+      "level": 60,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        44117,
+        48898,
+        15357
+      ],
+      "reasons": [
+        "chthonic_wing"
+      ]
+    },
+    {
+      "id": "a9a5d740-97a8-4291-be3f-9bebbbeca15f",
+      "name": "High Lord Baln",
+      "level": 70,
+      "classType": "DOL.GS.HighLordBaln",
+      "spawn": [
+        35351,
+        39179,
+        14958
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "aa28343e-fcff-451b-bb92-739717081889",
+      "name": "Duke Eligar",
+      "level": 75,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        39389,
+        38388,
+        15628
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "acafcd58-1b1a-4d69-aded-63e8e6799e08",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        43167,
+        49552,
+        20833
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "b3445c4f-a806-45d8-99bd-deeab17aa5f0",
+      "name": "Mutilator Oprionach",
+      "level": 74,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45995,
+        44599,
+        15640
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "b6211c92-ed4f-4a6b-9438-27435f35669f",
+      "name": "Earl Glassalab",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        24849,
+        17604,
+        17608
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "b639ea7d-1730-4f5b-a355-94815cedb720",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        44853,
+        49082,
+        20861
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "b767f01d-b2ce-473b-a6f1-d0e4a8e0ac55",
+      "name": "Prince Asmoien",
+      "level": 78,
+      "classType": "DOL.GS.PrinceAsmoien",
+      "spawn": [
+        24868,
+        32144,
+        16086
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "b8b67216-c99f-47c4-a187-acae13a862de",
+      "name": "Earl Fenex",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        48623,
+        32358,
+        16008
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "b9c219dd-4b3e-4e9a-ae95-791b8cfe8700",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45504,
+        49067,
+        20870
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "ba1754f0-0e8f-4fda-8f79-58a5be5d801d",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        42448,
+        49163,
+        20853
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "bf689091-b0c0-4ada-aad6-5cd6fd4f1ce2",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45177,
+        49194,
+        20862
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "c1f28aa5-ea62-4002-a141-083667dd4c58",
+      "name": "Marquis Scottiax",
+      "level": 73,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45990,
+        29626,
+        16152
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "c5333123-00f2-425f-b396-567b8f2b01be",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45574,
+        50058,
+        20870
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "c8dd3d3b-21fa-4749-978f-2fce6d5df4fb",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        44661,
+        50069,
+        20852
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "c9845d85-ca05-46c1-a75a-fbdb859ff5cf",
+      "name": "Mutilator Felrath",
+      "level": 67,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        43215,
+        47355,
+        15460
+      ],
+      "reasons": [
+        "chthonic_wing"
+      ]
+    },
+    {
+      "id": "d8fcd641-7a59-4c8a-b1a7-27eba5a1d15e",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45961,
+        49125,
+        20860
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "e0d75830-4276-4bd0-a0bf-a153480a2bfa",
+      "name": "Grand Chancellor Adremal",
+      "level": 79,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45057,
+        45808,
+        15470
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "e3160259-66a5-41de-ab46-cb0d92a02873",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        44956,
+        50133,
+        20855
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "eef88745-7f15-46cd-8a7e-da65ff2a8cb1",
+      "name": "Mutilator Samiol",
+      "level": 74,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        44113,
+        44746,
+        15641
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "eff810dc-0517-4265-9fe0-1517e2b0b419",
+      "name": "Princess Nahemah",
+      "level": 71,
+      "classType": "DOL.GS.PrincessNahemah",
+      "spawn": [
+        18329,
+        24840,
+        17246
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "f34dbc00-4d33-4063-be97-caa0a726a878",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        46596,
+        49094,
+        20858
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "f4a5fa53-026a-426f-b721-688000295e46",
+      "name": "clinging soul",
+      "level": 42,
+      "classType": "DOL.GS.GameNPC",
+      "spawn": [
+        45909,
+        49793,
+        20833
+      ],
+      "reasons": [
+        "legion_island_soul"
+      ]
+    },
+    {
+      "id": "f7c1367b-7458-4611-9f20-06dc16092ee9",
+      "name": "Field Marshal Nebir",
+      "level": 70,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        40000,
+        43026,
+        15493
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    },
+    {
+      "id": "fa4e7b6f-93a1-4104-ba2a-ae3421ce121b",
+      "name": "High Lord Oro",
+      "level": 66,
+      "classType": "DOL.GS.HighLordOroClone",
+      "spawn": [
+        45362,
+        25734,
+        15806
+      ],
+      "reasons": [
+        "scripted"
+      ]
+    },
+    {
+      "id": "fcb4b9a0-3dda-429a-ac29-0aa5e3f16d99",
+      "name": "Earl Mercur",
+      "level": 71,
+      "classType": "DOL.GS.GameEpicNPC",
+      "spawn": [
+        45750,
+        26471,
+        15683
+      ],
+      "reasons": [
+        "epic_level_70_plus"
+      ]
+    }
+  ]
+}

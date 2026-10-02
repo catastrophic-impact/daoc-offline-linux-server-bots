@@ -1,0 +1,60 @@
+﻿<Project>
+    <PropertyGroup>
+        <BaseIntermediateOutputPath>..\build\Tests\$(Configuration)\</BaseIntermediateOutputPath>
+    </PropertyGroup>
+    <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+        <AssemblyName>Tests</AssemblyName>
+        <OutputType>Library</OutputType>
+        <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
+        <OutputPath>..\build\Tests\$(Configuration)\lib\</OutputPath>
+        <IntermediateOutputPath>..\build\Tests\$(Configuration)\obj\</IntermediateOutputPath>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <Deterministic>false</Deterministic>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <DefineConstants>DEBUG;TRACE</DefineConstants>
+        <Optimize>False</Optimize>
+        <DebugType>Full</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <DefineConstants>TRACE</DefineConstants>
+        <Optimize>true</Optimize>
+        <DebugType>None</DebugType>
+        <DebugSymbols>false</DebugSymbols>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
+        <RegisterForComInterop>False</RegisterForComInterop>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.3" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+        <PackageReference Include="NUnit" Version="4.5.0" />
+        <PackageReference Include="NUnit3TestAdapter" Version="6.1.0" />
+        <ProjectReference Include="..\CoreBase\CoreBase.csproj" Name="CoreBase" />
+        <ProjectReference Include="..\CoreDatabase\CoreDatabase.csproj" Name="CoreDatabase" />
+        <ProjectReference Include="..\CoreServer\CoreServer.csproj" Name="CoreServer" />
+        <ProjectReference Include="..\GameServer\GameServer.csproj" Name="GameServer" />
+        <ProjectReference Include="..\WorldBuilder\WorldBuilder.csproj" Name="WorldBuilder" />
+    </ItemGroup>
+    <ItemGroup>
+        <ScriptFiles Include="..\GameServerScripts\**\*.cs" />
+        <DbUpdaterFiles Include="..\GameServerScripts\dbupdater\**\*.xml" />
+        <TranslationFiles Include="..\GameServer\language\**\*.txt" />
+    </ItemGroup>
+    <ItemGroup>
+      <Folder Include="IntegrationTests\" />
+    </ItemGroup>
+    <Target Name="CopyFiles" AfterTargets="AfterBuild">
+        <Copy SourceFiles="@(ScriptFiles)" DestinationFiles="@(ScriptFiles->'$(MSBuildProjectDirectory)\$(OutputPath)\..\scripts\%(RecursiveDir)%(Filename)%(Extension)')" />
+        <Copy SourceFiles="@(DbUpdaterFiles)" DestinationFiles="@(DbUpdaterFiles->'$(MSBuildProjectDirectory)\$(OutputPath)\..\scripts\dbupdater\%(RecursiveDir)%(Filename)%(Extension)')" />
+        <Copy SourceFiles="@(TranslationFiles)" DestinationFiles="@(TranslationFiles->'$(MSBuildProjectDirectory)\$(OutputPath)\..\languages\%(RecursiveDir)%(Filename)%(Extension)')" />
+    </Target>
+    <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>
