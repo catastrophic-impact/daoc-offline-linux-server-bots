@@ -35,10 +35,14 @@ namespace DOL.GS.PropertyCalc
         {
             int chance = 0;
 
-            if (living is GamePlayer player)
+            // Players and GameBots share the player formula: Shields spec,
+            // dexterity and items (+Shield skill). TryBlock checks the Shield
+            // ability, the shield itself and its quality and condition.
+            if (PlayerDefenseFormula.UsesPlayerDefense(living))
             {
-                chance += (player.Dexterity * 2 - 100) / 4 + (player.GetModifiedSpecLevel(Specs.Shields) - 1) * (10 / 2) + 50;
-                chance += player.AbilityBonus[property] * 10;
+                chance += PlayerDefenseFormula.Block(living.GetModified(eProperty.Dexterity),
+                    living.GetModifiedSpecLevel(Specs.Shields));
+                chance += living.AbilityBonus[property] * 10;
             }
             else if (living is GameNPC npc)
                 chance += npc.BlockChance * 10;

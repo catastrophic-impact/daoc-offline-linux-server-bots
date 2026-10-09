@@ -55,7 +55,13 @@ namespace DOL.GS
         internal AutonomousGoalAttempt GoalDiagnosticAttempt;
         private byte _lastAutonomousTrainedLevel = 1;
         public bool HasPendingAutonomousTraining => IsAutonomousWorldBot && _lastAutonomousTrainedLevel < Level;
-        public bool HasSpendableAutonomousTrainingPoints
+        /// <summary>
+        /// Spec points to spend, or enough realm ability points to be worth the trip (both at the class
+        /// trainer; a few realm points are spent at the next level-up visit instead).
+        /// </summary>
+        public bool HasSpendableAutonomousTrainingPoints =>
+            HasSpendableAutonomousSpecPoints || AutonomousBotRealmAbilities.WorthTrainerTrip(this);
+        private bool HasSpendableAutonomousSpecPoints
         {
             get
             {
@@ -605,7 +611,9 @@ namespace DOL.GS
             StopMoving();
             if (Brain is BotBrain brain)
                 brain.ClearAggroList();
-            if (ControlledBrain != null)
+            // A player keeps their pet when boarding a horse (MountSteed releases nothing); so do the player's
+            // companions, whose pet is placed beside them on arrival. Gamebots still release it.
+            if (ControlledBrain != null && !IsTemporaryGroupHelper)
                 ReleaseControlledPet(PetReleaseReason.StableTravel);
             AutonomousPetSupport.ReleaseFieldTurrets(this);
 
@@ -669,7 +677,7 @@ namespace DOL.GS
             }
             AutonomousStuckWatchdog.MarkProgress(this, eAutonomousProgressKind.StableTravel);
             log.Info($"AUTONOMOUS_STABLE_ROUTE_BOARD bot=\"{Name}\" id={DatabaseID} level={Level} " +
-                     $"realm={Realm} destination=\"{StableRouteDestination}\" ticket=\"{ticket?.Name}\" " +
+                     $"realm={GlobalConstants.RealmToName(Realm)} destination=\"{StableRouteDestination}\" ticket=\"{ticket?.Name}\" " +
                      $"endpoint={_stableRouteEndpoint.X},{_stableRouteEndpoint.Y},{_stableRouteEndpoint.Z}");
             return true;
         }
@@ -696,6 +704,22 @@ namespace DOL.GS
         private void CompleteStableMasterRoute(bool confirmedArrival)
         {
             bool wasStableTravel = IsOnStableMasterRoute;
+            try { CompleteStableMasterRouteCore(confirmedArrival, wasStableTravel); }
+            finally
+            {
+                // A companion's pet rejoins it at the end of the ride (it could not keep up with the horse).
+                if (wasStableTravel && IsTemporaryGroupHelper && ControlledBrain?.Body is { IsAlive: true } pet &&
+                    pet.ObjectState == eObjectState.Active && pet.CurrentRegionID == CurrentRegionID && pet.MaxSpeedBase > 0 &&
+                    !IsWithinRadius(pet, 400))
+                {
+                    Point2D beside = GetPointFromHeading(Heading, 64);
+                    pet.MoveInRegion(CurrentRegionID, beside.X, beside.Y, Z + 10, (ushort)((Heading + 2048) % 4096), false);
+                }
+            }
+        }
+
+        private void CompleteStableMasterRouteCore(bool confirmedArrival, bool wasStableTravel)
+        {
             string completedDestination = StableRouteDestination;
             _stableRouteDepartureTimer?.Stop();
             _stableRouteDepartureTimer = null;
@@ -711,17 +735,23 @@ namespace DOL.GS
             if (wasStableTravel && IsAutonomousWorldBot)
             {
                 Vector3 arrival = new(X, Y, Z);
-                if (AutonomousStableRoutePlanner.ShouldCorrectAuditedMularnLanding(
-                        confirmedArrival, IsAlive, CurrentRegionID, arrival) &&
-                    AutonomousRouteHotspotRepair.TryResolveFloor(PathfindingProvider.Instance,
-                        CurrentZone, CurrentRegionID, arrival, out Vector3 floor) &&
+                // A horse lands on the ground. Route end points were recorded on another client's
+                // terrain at some border keeps (Castle Sauvage ~150 units low, Svasud Faste ~450 units
+                // high on the classic meshes), leaving the rider off the walkable floor; every route
+                // then failed and the pocket escape sent it to its capital (164 Albion bots in 30
+                // minutes, 2026-10-06). Same spot, real floor height.
+                if ((AutonomousStableRoutePlanner.ShouldCorrectAuditedMularnLanding(
+                         confirmedArrival, IsAlive, CurrentRegionID, arrival) &&
+                     AutonomousRouteHotspotRepair.TryResolveFloor(PathfindingProvider.Instance,
+                         CurrentZone, CurrentRegionID, arrival, out Vector3 floor) ||
+                     IsAlive && AutonomousStableRoutePlanner.TryGroundLanding(PathfindingProvider.Instance, CurrentZone, arrival, out floor)) &&
                     MoveInRegion(CurrentRegionID, (int)Math.Round(floor.X), (int)Math.Round(floor.Y),
                         (int)Math.Round(floor.Z), Heading, true))
                     log.Info($"AUTONOMOUS_STABLE_LANDING_CORRECTION bot=\"{Name}\" id={DatabaseID} " +
                              $"region={CurrentRegionID} from={arrival} to={floor}");
                 AutonomousStuckWatchdog.MarkProgress(this, eAutonomousProgressKind.StableTravel);
                 log.Info($"AUTONOMOUS_STABLE_ROUTE_ARRIVE bot=\"{Name}\" id={DatabaseID} level={Level} " +
-                         $"realm={Realm} destination=\"{completedDestination}\" position={X},{Y},{Z}");
+                         $"realm={GlobalConstants.RealmToName(Realm)} destination=\"{completedDestination}\" position={X},{Y},{Z}");
             }
         }
 
@@ -754,7 +784,7 @@ namespace DOL.GS
             if (_stableRouteMount?.ObjectState is not eObjectState.Active)
             {
                 log.Warn($"AUTONOMOUS_STABLE_ROUTE_FAIL bot=\"{Name}\" id={DatabaseID} level={Level} " +
-                         $"realm={Realm} destination=\"{StableRouteDestination}\" reason=\"authoritative taxi left world before arrival\"");
+                         $"realm={GlobalConstants.RealmToName(Realm)} destination=\"{StableRouteDestination}\" reason=\"authoritative taxi left world before arrival\"");
                 CompleteStableMasterRoute();
                 return;
             }
@@ -1130,7 +1160,11 @@ namespace DOL.GS
             // A combat knockback/dragon throw must not recall and reset an entire raid.
             // Genuine portal transfers use the separate transfer coordinator.
             if (DragonCombatGeometry.IsRecoveringFromThrow(Owner) ||
-                CurrentRegionID == Owner.CurrentRegionID && TemporaryCompanionRecovery.HasPartyCombat(this))
+                CurrentRegionID == Owner.CurrentRegionID && TemporaryCompanionRecovery.HasPartyCombat(this) &&
+                !TemporaryCompanionRecovery.FrontierChaseLeash(this))
+                return false;
+            // A raid squad on a keep siege holds its post until the event ends (goal 11: no leash during sieges).
+            if (CurrentRegionID == Owner.CurrentRegionID && CompanionRaidSiege.Holds(this))
                 return false;
 
             Vector3 destination = TemporaryGroupStableTravel.FormationPoint(Owner, CompanionRaid.IsMember(this) ? Math.Max(0, GroupIndex - 1) : ObjectID % 6);
@@ -1544,6 +1578,7 @@ namespace DOL.GS
             if (!IsAutonomousWorldBot || amount <= 0)
                 return;
             AutonomousRealmPoints += amount;
+            RealmLevel = Math.Max(RealmLevel, AutonomousBotRealmPointRewards.RealmLevelFor(AutonomousRealmPoints));
             AutonomousStuckWatchdog.MarkProgress(this, eAutonomousProgressKind.RealmPoints);
             MarkAutonomousStateDirty();
         }
@@ -1649,6 +1684,10 @@ namespace DOL.GS
 
                 Flags |= eFlags.STEALTH;
                 OnMaxSpeedChange();
+                // Vanish from enemy players who cannot detect it (GamePlayer.CanDetect), as a stealthing player does.
+                foreach (GamePlayer viewer in GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
+                    if (!viewer.CanDetect(this))
+                        viewer.Out.SendObjectRemove(this);
                 return;
             }
 
@@ -2336,6 +2375,8 @@ namespace DOL.GS
                 AutonomousBotStatusPersistence.Queue(this, starterWeaponAdded);
             Experience = Math.Max(0, record.Experience);
             AutonomousRealmPoints = Math.Max(0, record.RealmPoints);
+            RealmLevel = AutonomousBotRealmPointRewards.RealmLevelFor(AutonomousRealmPoints);
+            AutonomousBotRealmAbilities.Restore(this, ParseTrainedRealmPoints(record.SerializedAbilities));
             CurrentRegionID = (ushort)Math.Clamp(record.RegionId, 0, ushort.MaxValue);
             X = record.X;
             Y = record.Y;
@@ -2575,6 +2616,31 @@ namespace DOL.GS
         /// </summary>
         public override bool MoveTo(ushort regionID, int x, int y, int z, ushort heading)
         {
+            // Owner 2026-10-07: travelling the old frontiers, the pets of the player's /spawn and /raid companions died
+            // on every move (the move removes the bot from the world, which released its pet) and their pet classes kept
+            // re-summoning. Within a region a companion's pet now comes along and is placed behind it, as a player's pet
+            // is on a teleport (GamePlayer.MoveTo). Across regions pets are released as for players. Gamebots unchanged.
+            GameNPC carriedPet = IsTemporaryGroupHelper && regionID == CurrentRegionID && ControlledBrain?.Body is { IsAlive: true } body &&
+                body.ObjectState == eObjectState.Active ? body : null;
+            if (carriedPet == null)
+                return MoveToCore(regionID, x, y, z, heading);
+            _keepPetThroughMove++;
+            bool result;
+            try { result = MoveToCore(regionID, x, y, z, heading); }
+            finally { _keepPetThroughMove--; }
+            if (result && ControlledBrain?.Body == carriedPet && carriedPet.IsAlive && carriedPet.ObjectState == eObjectState.Active &&
+                carriedPet.MaxSpeedBase > 0)
+            {
+                Point2D behind = GetPointFromHeading(Heading, 64);
+                carriedPet.MoveInRegion(CurrentRegionID, behind.X, behind.Y, Z + 10, (ushort)((Heading + 2048) % 4096), false);
+            }
+            return result;
+        }
+
+        private int _keepPetThroughMove;
+
+        private bool MoveToCore(ushort regionID, int x, int y, int z, ushort heading)
+        {
             if (!IsAutonomousWorldBot)
                 return base.MoveTo(regionID, x, y, z, heading);
 
@@ -2675,7 +2741,7 @@ namespace DOL.GS
 
             Duel?.Stop();
 
-            if (ControlledBrain != null)
+            if (ControlledBrain != null && _keepPetThroughMove == 0)
                 ReleaseControlledPet(PetReleaseReason.WorldRemoval);
 
             if (IsAutonomousWorldBot && !intentionalWorldMove)
@@ -2921,7 +2987,7 @@ namespace DOL.GS
         {
             const string prefix = "trained-level|";
             if (!string.IsNullOrWhiteSpace(serialized) && serialized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
-                byte.TryParse(serialized.AsSpan(prefix.Length), out byte trained))
+                byte.TryParse(serialized.Split('|')[1], out byte trained))
                 return (byte)Math.Clamp((int)trained, 1, currentLevel);
 
             // Existing characters already have their trained spec levels saved.
@@ -2929,13 +2995,34 @@ namespace DOL.GS
             return string.IsNullOrWhiteSpace(serializedSpecs) ? (byte)1 : currentLevel;
         }
 
+        /// <summary>"trained-level|N|realm-points|M": realm ability points already spent at a trainer (0 when absent).</summary>
+        public static int ParseTrainedRealmPoints(string serialized)
+        {
+            string[] parts = serialized?.Split('|') ?? Array.Empty<string>();
+            for (int i = 0; i + 1 < parts.Length; i++)
+                if (parts[i].Equals("realm-points", StringComparison.OrdinalIgnoreCase) && int.TryParse(parts[i + 1], out int points))
+                    return Math.Max(0, points);
+            return 0;
+        }
+
         public bool TrainPendingSpecializations(GameTrainer trainer)
         {
-            if (!HasPendingAutonomousTraining || trainer == null ||
+            if (!HasPendingAutonomousTraining && !AutonomousBotRealmAbilities.HasPurchase(this))
+                return false;
+            if (trainer == null ||
                 trainer.ObjectState != eObjectState.Active || trainer.CurrentRegionID != CurrentRegionID ||
                 !IsWithinRadius(trainer, 350) ||
                 trainer.TrainedClass != eCharacterClass.Unknown && trainer.TrainedClass != (eCharacterClass)CharacterClass.ID)
                 return false;
+
+            // Realm abilities are bought at the same visit (the class trainer, as a player would).
+            string realmAbilities = AutonomousBotRealmAbilities.Train(this);
+            if (!HasPendingAutonomousTraining)
+            {
+                MarkAutonomousStateDirty();
+                AutonomousBotStatusPersistence.Queue(this, true);
+                return realmAbilities.Length > 0;
+            }
 
             byte previous = _lastAutonomousTrainedLevel;
             Dictionary<string, int> beforeSpecs = GetSpecList()
@@ -3034,7 +3121,7 @@ namespace DOL.GS
             record.IsAlive = IsAlive;
             record.IsOnline = ObjectState == eObjectState.Active;
             record.SerializedSpecs = string.Join(';', GetSpecList().Where(spec => spec.Trainable).Select(spec => $"{spec.KeyName}|{spec.Level}"));
-            record.SerializedAbilities = $"trained-level|{_lastAutonomousTrainedLevel}";
+            record.SerializedAbilities = $"trained-level|{_lastAutonomousTrainedLevel}|realm-points|{AutonomousBotRealmAbilities.TrainedPoints(this)}";
             record.UnspentSpecPoints = m_leftOverSpecPoints;
             record.LastSavedUtc = DateTime.UtcNow.ToString("O");
             record.LastUpdateUtc = record.LastSavedUtc;
@@ -3719,9 +3806,14 @@ namespace DOL.GS
 
         private bool AreSpellsEqual(Spell spellOne, Spell spellTwo)
         {
+            // Ranks of one proc line may differ in proc chance (Valewalker
+            // Witherstrike 20 vs 15); they still replace one another
+            // (stefanrows/OfflineDAoC fork, 0.185.0).
+            bool sameProcLine = spellOne.SpellType is eSpellType.OffensiveProc or eSpellType.DefensiveProc &&
+                                spellOne.Group != 0;
             return spellOne.DamageType == spellTwo.DamageType &&
                    spellOne.SpellType == spellTwo.SpellType &&
-                   spellOne.Frequency == spellTwo.Frequency &&
+                   (sameProcLine || spellOne.Frequency == spellTwo.Frequency) &&
                    spellOne.CastTime == spellTwo.CastTime &&
                    spellOne.Target == spellTwo.Target &&
                    spellOne.Group == spellTwo.Group &&

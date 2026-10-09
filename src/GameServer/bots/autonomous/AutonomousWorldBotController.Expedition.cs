@@ -5,6 +5,8 @@ namespace DOL.GS;
 public sealed partial class AutonomousWorldBotController
 {
     private long _expeditionRouteRetry;
+    private long _expeditionOrdinaryUntil;
+    private int _expeditionRouteFailures;
     private Vector3[] _expeditionSeams;
     private int _expeditionLeg;
     private string _expeditionEvent;
@@ -28,7 +30,11 @@ public sealed partial class AutonomousWorldBotController
             Vector2.DistanceSquared(new(c.X,c.Y),new(home.X,home.Y)) <= DragonRallyRoute.ApproachRadius*DragonRallyRoute.ApproachRadius)
             return TravelDragonRally(bot,order,home);
         _dragonRallyPlanning=null; _dragonRallyRoute=null; _dragonRallyEvent=null;
-        if (AutonomousRealmRaid.TryIndependentApproach(bot, out var exterior, out var via))
+        // After repeated exterior-corridor failures from one spot (a stable landing whose
+        // corridor never proves, Vindsaul Faste 2026-10-06) the ordinary region travel below
+        // takes over for a while; it has the usual route and pocket recovery.
+        if (GameLoop.GameLoopTime >= _expeditionOrdinaryUntil &&
+            AutonomousRealmRaid.TryIndependentApproach(bot, out var exterior, out var via))
         {
             Vector3 position = new(bot.X, bot.Y, bot.Z);
             if (_expeditionEvent != order.EventId || _expeditionRegion != bot.CurrentRegionID ||
@@ -45,11 +51,20 @@ public sealed partial class AutonomousWorldBotController
                     new(bot.X, bot.Y, bot.Z), exterior, out _expeditionSeams, via))
                 {
                     _expeditionSeams = null;
+                    if (++_expeditionRouteFailures >= 4)
+                    {
+                        _expeditionRouteFailures = 0;
+                        _expeditionOrdinaryUntil = GameLoop.GameLoopTime + 120_000;
+                        Log.Warn($"REALM_EXPEDITION_ORDINARY_TRAVEL bot={bot.Name} id={bot.DatabaseID} region={bot.CurrentRegionID} " +
+                            $"position={bot.X},{bot.Y},{bot.Z} event={order.EventId}");
+                        return true;
+                    }
                     _expeditionRouteRetry = GameLoop.GameLoopTime + 15_000;
                     bot.StopMovingOnPath(); bot.StopMoving();
                     SetStatus(bot, "Expedition route retry", c.MonsterName, "No connected exterior corridor; retaining assignment and retrying safely");
                     return true;
                 }
+                _expeditionRouteFailures = 0;
                 _expeditionLeg = 0;
             }
             while (_expeditionLeg < _expeditionSeams.Length &&
@@ -70,6 +85,7 @@ public sealed partial class AutonomousWorldBotController
         int arrival = order.Crossing ? 32 : 175;
         if (Vector3.DistanceSquared(new(bot.X,bot.Y,bot.Z),post) > arrival * arrival)
         {
+            if (FollowDarknessFallsRaidChain(bot, post, c.MonsterName)) return true;
             if (!TryBeginFasterStableRoute(bot,post,c.ZoneName))
                 IssuePath(bot,post,preciseArrival:order.Crossing);
             SetStatus(bot,order.State,c.MonsterName,"Traveling to the expedition; late members rejoin without town staging");
@@ -134,5 +150,37 @@ public sealed partial class AutonomousWorldBotController
         { _dragonRallyRoute=null;_dragonRallyRetry=now+15_000;bot.StopMovingOnPath();bot.StopMoving(); }
         else SetStatus(bot,"Traveling to dragon rally",order.Camp.MonsterName,"Following a checked route outside the dragon's aggro area");
         return true;
+    }
+
+    // Consecutive expedition route failures from (nearly) the same floor point.
+    // A member on a disconnected navmesh island (a ledge, a fall, a bad respawn
+    // landing) cannot path to any route stage; it used to retry every 30 seconds
+    // for the whole four-hour expedition.
+    public const int StrandedExpeditionFailureLimit = 3;
+    public const float StrandedExpeditionRadius = 400;
+    private int _strandedExpeditionFailures;
+    private Vector3 _strandedExpeditionPosition;
+
+    public static bool ShouldRegroupStrandedMember(int failures, bool alive, bool inCombat) =>
+        alive && !inCombat && failures >= StrandedExpeditionFailureLimit;
+
+    private void TryRegroupStrandedExpeditionMember(GameBot bot)
+    {
+        Vector3 here = new(bot.X, bot.Y, bot.Z);
+        _strandedExpeditionFailures = Vector2.DistanceSquared(new(here.X, here.Y),
+            new(_strandedExpeditionPosition.X, _strandedExpeditionPosition.Y)) <= StrandedExpeditionRadius * StrandedExpeditionRadius
+            ? _strandedExpeditionFailures + 1 : 1;
+        _strandedExpeditionPosition = here;
+        if (!ShouldRegroupStrandedMember(_strandedExpeditionFailures, bot.IsAlive, bot.InCombat) ||
+            !AutonomousRealmRaid.TryDungeonRegroupPoint(bot, out ushort region, out Vector3 front) ||
+            Vector3.DistanceSquared(here, front) <= 300 * 300)
+            return;
+        _strandedExpeditionFailures = 0;
+        if (!bot.MoveInRegion(region, (int)front.X, (int)front.Y, (int)front.Z, bot.Heading, true))
+            return;
+        _expeditionRouteRetry = 0;
+        AutonomousStuckWatchdog.MarkProgress(bot, eAutonomousProgressKind.Recovery);
+        Log.Warn($"REALM_EXPEDITION_STRANDED_REGROUP bot={bot.Name} id={bot.DatabaseID} region={region} " +
+                 $"from={(int)here.X},{(int)here.Y},{(int)here.Z} to={(int)front.X},{(int)front.Y},{(int)front.Z}");
     }
 }

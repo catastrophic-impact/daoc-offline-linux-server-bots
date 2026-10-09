@@ -66,9 +66,23 @@ public static class AutonomousBotRegistry
 
     public static bool TryGet(long botId, out GameBot bot) => Active.TryGetValue(botId, out bot);
 
-    public static GameBot[] Snapshot() => Active.Values
-        .Where(bot => bot?.ObjectState == GameObject.eObjectState.Active)
-        .ToArray();
+    // One array per game-loop tick, shared by every caller (all read-only): RvR planning built a
+    // fresh 9,000-entry array per AI turn (55 MB of allocations in 40 s, run 9 trace).
+    private sealed record CachedSnapshot(long Tick, GameBot[] Bots);
+    private static volatile CachedSnapshot _snapshot = new(-1, []);
+    public const long SnapshotMaxAgeMilliseconds = 250;
+
+    public static GameBot[] Snapshot()
+    {
+        long tick = GameLoop.GameLoopTime;
+        CachedSnapshot cached = _snapshot;
+        // Register/Unregister invalidate it; otherwise a quarter-second-old roster is fine for
+        // planning (callers check state themselves). Per-tick rebuilds were ~23 MB per 40 s.
+        if (cached.Tick > 0 && tick >= cached.Tick && tick - cached.Tick < SnapshotMaxAgeMilliseconds) return cached.Bots;
+        GameBot[] bots = Active.Values.Where(bot => bot?.ObjectState == GameObject.eObjectState.Active).ToArray();
+        _snapshot = new(tick, bots);
+        return bots;
+    }
 
     public static IReadOnlyDictionary<eRealm, int> CountByRealm() => Active.Values
         .Where(bot => bot?.ObjectState == GameObject.eObjectState.Active)
@@ -91,7 +105,10 @@ public static class AutonomousBotRegistry
     public static void Register(GameBot bot)
     {
         if (bot?.IsAutonomousWorldBot == true && bot.DatabaseID > 0)
+        {
             Active[bot.DatabaseID] = bot;
+            _snapshot = new(-1, []);
+        }
     }
 
     public static void Unregister(GameBot bot)
@@ -100,6 +117,7 @@ public static class AutonomousBotRegistry
         {
             AutonomousGoalDiagnostics.End(bot, GoalAttemptEnd.Logout, "Bot left the active world; not a goal failure");
             Active.TryRemove(bot.DatabaseID, out _);
+            _snapshot = new(-1, []);
             AutonomousBotEconomy.ForgetCachedDecision(bot.DatabaseID);
         }
     }

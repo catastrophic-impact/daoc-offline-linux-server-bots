@@ -27,6 +27,9 @@ public sealed partial class AutonomousWorldBotController
             home, passage.Location.X, passage.Location.Y, passage.Location.Z, bot.Level, false, true));
     }
 
+    /// <summary>Beyond this distance from the medallion merchant a bot enters the frontier on foot through its own border keep.</summary>
+    private const int FrontierMedallionReach = 20_000;
+
     private bool TryFrontierTransport(GameBot bot, CampDestination destination)
     {
         if (bot.CurrentRegionID == destination.RegionId || bot.CurrentRegionID is not (1 or 100 or 200) ||
@@ -66,6 +69,14 @@ public sealed partial class AutonomousWorldBotController
                     .Where(npc => (npc.Realm==bot.Realm || npc.Realm==eRealm.None) && npc.TradeItems?.GetAllItems().Values.OfType<DbItemTemplate>().Any(item=>item.Id_nb==passage.Medallion)==true)
                     .OrderBy(_frontierPorter.GetDistanceTo).FirstOrDefault();
             if (_medallionMerchant == null) return false;
+            // Each realm sells frontier medallions only at its first border keep (Druim Ligen, Castle Sauvage, Svasud
+            // Faste). A bot staged at the other border keep walks into the frontier through that keep's gate, as players
+            // do, instead of crossing the realm for a medallion (run 24: Hibernians at Druim Cain stood still for 15
+            // minutes "collecting a frontier medallion" 110,000 units from Araisa).
+            if (bot.GetDistanceTo(_medallionMerchant) > FrontierMedallionReach) return false;
+            // A ride (town teleporter or horse route) when clearly faster than walking to the merchant.
+            if (TryBeginFasterStableRoute(bot, new(_medallionMerchant.X, _medallionMerchant.Y, _medallionMerchant.Z), _medallionMerchant.Name))
+                return true;
             if (!ApproachSupplyMerchant(bot, _medallionMerchant))
             {
                 SetRvrStatus(bot,"Collecting frontier medallion",destination.MonsterName,$"Walking to {_medallionMerchant.Name} for {passage.Medallion}");

@@ -289,6 +289,7 @@ public sealed class UT_SluaghbinderPriestSupport
     [TestCase("zombie magician", 90, 0.50, 960)]
     [TestCase("zombie guardian", 145, 0.84, 1714)]
     [TestCase("zombie priest", 115, 0.55, 1086)]
+    [TestCase("ghastly healer", 115, 0.55, 1086)]
     [TestCase("dullahan", 130, 0.69, 1385)]
     public void PlayerPetSharesBotHealthWithoutChangingItsDamage(string role, int conPercent, double factor, int hpAt50)
     {
@@ -411,6 +412,13 @@ public sealed class UT_SluaghbinderPriestSupport
         _actors.Add(actor);
         return actor;
     }
+
+    [TestCase("zombie priest", true)]
+    [TestCase("Ghastly Healer", true)]
+    [TestCase("zombie magician", false)]
+    [TestCase(null, false)]
+    public void HealerRoleKeepsWorkingUnderTheGhastlyHealerName(string name, bool healer) =>
+        Assert.That(SluaghbinderPet.IsHealerRole(name), Is.EqualTo(healer));
 
     private static void Set(Type type, object target, string field, object value) =>
         type.GetField(field, Hidden).SetValue(target, value);

@@ -77,6 +77,8 @@ namespace DOL.GS
             }
             if (_supplySpacePoint.HasValue)
                 IssuePath(bot, _supplySpacePoint.Value, preciseArrival: true);
+            else if (bot.GetDistanceTo(merchant) > 2_000)
+                IssuePath(bot, center); // no interaction spot resolved from far away yet: head toward the merchant, never stand still
             else
             {
                 bot.StopMovingOnPath();

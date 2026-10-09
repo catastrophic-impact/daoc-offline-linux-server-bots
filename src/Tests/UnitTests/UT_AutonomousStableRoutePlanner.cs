@@ -166,11 +166,30 @@ public sealed class UT_AutonomousStableRoutePlanner
         {
             Assert.That(Vector3.Distance(approach, origin), Is.LessThanOrEqualTo(45));
             Assert.That(Vector3.Distance(approach, master), Is.LessThanOrEqualTo(147));
+            // A master 490 units from the horse start: wait in the master's range instead.
+            Vector3 farMaster = new(342000, 593284, 5456);
             Assert.That(AutonomousStableRoutePlanner.TryChooseBoardingApproach(origin,
-                new(342000, 593284, 5456), 192, point => point, out _), Is.False);
+                farMaster, 192, point => point, out Vector3 inRange), Is.True);
+            Assert.That(Vector3.Distance(inRange, farMaster), Is.LessThanOrEqualTo(147));
+            Assert.That(Vector3.Distance(inRange, origin), Is.LessThan(Vector3.Distance(farMaster, origin)),
+                "the waiting spot leans toward the horse start");
+            // Beyond the 500-unit boarding limit there is still no approach.
+            Assert.That(AutonomousStableRoutePlanner.TryChooseBoardingApproach(origin,
+                new(341900, 593284, 5456), 192, point => point, out _), Is.False);
             Assert.That(AutonomousStableRoutePlanner.TryChooseBoardingApproach(origin, master,
                 192, point => point + new Vector3(100, 0, 0), out _), Is.False);
         });
+    }
+
+    [Test]
+    public void HagallGryphonToIarnDwarfCampIsBoardable()
+    {
+        // Korlis (Hagall) and the start of Gryphon_Hagall_IarnDwarf, 229 units apart.
+        Vector3 origin = new(380659, 383307, 7752);
+        Vector3 korlis = new(380449, 383398, 7752);
+        Assert.That(AutonomousStableRoutePlanner.TryChooseBoardingApproach(origin, korlis,
+            192, point => point, out Vector3 approach), Is.True);
+        Assert.That(Vector3.Distance(approach, korlis), Is.LessThanOrEqualTo(147));
     }
 
     [Test]

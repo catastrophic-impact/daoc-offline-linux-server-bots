@@ -59,6 +59,22 @@ public class UT_PhysicalSiegeRally
         Assert.That(reason, Does.Contain("defended"));
     }
 
+    [Test]
+    public void AnArmyDrivenOffAfterReachingTheKeepEndsTheSiegeAsDefended()
+    {
+        // Run 2026-10-07: Midgard was wiped at Caer Erasleigh, yet the event held Albion's defenders for four hours.
+        long now = GameLoop.GameLoopTime;
+        var (target, forces) = Open(false, now, 14);
+        long ready = now + RealmEventPolicy.EarliestAssaultMilliseconds;
+        Attend(target, forces, 108, ready);
+        Assert.That(AutonomousRvrEventLayer.IsBattleForce(forces[0].GroupId, ready), Is.True);
+        Assert.That(AutonomousRvrEventLayer.GetRallyOrder(forces[0].GroupId, eRealm.Albion, ready + 1), Is.Null);
+        long gone = ready + AutonomousRvrEventLayer.RepelMilliseconds + 30_000;
+        AutonomousRvrEventLayer.GetRallyOrder(forces[0].GroupId, eRealm.Albion, gone);
+        Assert.That(AutonomousRvrEventLayer.TryConsumeRelease(forces[0].GroupId, gone, out string reason), Is.True);
+        Assert.That(reason, Does.Contain("Siege defended").And.Contain("no attacker"));
+    }
+
     [TestCase(false)] [TestCase(true)]
     public void ContinuousAssaultExpiresAfterFourHoursEvenIfNobodyArrives(bool relic)
     {

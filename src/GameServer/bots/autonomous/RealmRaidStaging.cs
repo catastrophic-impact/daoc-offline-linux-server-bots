@@ -63,4 +63,8 @@ public static class RealmRaidStaging
         }
         return true;
     }
+
+    /// <summary>Grounded and either at the lair or fighting wherever it was dragged.</summary>
+    public static bool DragonCountsAsLanded(bool flying, bool nearLair, bool inCombat) =>
+        !flying && (nearLair || inCombat);
 }

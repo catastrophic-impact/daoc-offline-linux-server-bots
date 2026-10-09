@@ -137,6 +137,18 @@ public static class AutonomousDarknessFallsNavigation
         return entries.Any(entry => MatchesCertifiedEntrance(edge, realm, entry));
     }
 
+    /// <summary>
+    /// A realm's own way into Darkness Falls from its home region. Realm events (Legion, the
+    /// High Lords...) are not ordinary camps, so they use these instead of certified camp entries.
+    /// </summary>
+    public static bool IsHomeEntrance(DbZonePoint edge)
+    {
+        if (edge?.TargetRegion != AutonomousDarknessFallsPolicy.RegionId) return false;
+        eRealm realm = new[] { eRealm.Albion, eRealm.Midgard, eRealm.Hibernia }
+            .FirstOrDefault(candidate => AutonomousDarknessFallsPolicy.HomeRegion(candidate) == edge.SourceRegion);
+        return realm != eRealm.None && (edge.Realm == 0 || edge.Realm == (ushort)realm);
+    }
+
     public static bool MatchesCertifiedEntrance(DbZonePoint edge, eRealm realm, Vector3 entry) =>
         edge != null && edge.TargetRegion == AutonomousDarknessFallsPolicy.RegionId &&
         edge.SourceRegion == AutonomousDarknessFallsPolicy.HomeRegion(realm) &&

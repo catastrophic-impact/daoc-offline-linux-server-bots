@@ -156,6 +156,9 @@ namespace DOL.GS
 
 			foreach (GameLiving living in targets)
 			{
+				// Owner 2026-10-07: Nottmoor Faste fell with its inner door still closed. Splash through the tower roof
+				// must not kill a keep lord: he is taken by fighting your way in to him.
+				if (living is Keeps.GuardLord) continue;
 				if (Owner is GameBot && (living == null || !BotSiegeRuntime.LegalEnemy(Owner, living) || BotPvpCrowdControl.Protected(Owner, living))) continue;
 				if(living == null)
 					continue;

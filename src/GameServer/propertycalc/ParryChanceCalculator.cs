@@ -37,29 +37,24 @@ namespace DOL.GS.PropertyCalc
         {
             int chance = 0;
 
-            if (living is GamePlayer player)
+            // Players and GameBots (gamebots and companions) share the player
+            // formula: Parry spec, dexterity, items (+Parry skill) and buffs.
+            if (PlayerDefenseFormula.UsesPlayerDefense(living))
             {
-                if (player.HasSpecialization(Specs.Parry))
-                    chance += (player.Dexterity * 2 - 100) / 4 + (player.GetModifiedSpecLevel(Specs.Parry) - 1) * (10 / 2) + 50;
+                bool hasParry = living is GamePlayer player ? player.HasSpecialization(Specs.Parry)
+                    : ((GameBot)living).HasSpecialization(Specs.Parry);
+                chance += PlayerDefenseFormula.Parry(living.GetModified(eProperty.Dexterity), hasParry,
+                    living.GetModifiedSpecLevel(Specs.Parry));
 
-                chance += player.BaseBuffBonusCategory[property] * 10;
-                chance += player.SpecBuffBonusCategory[property] * 10;
-                chance -= player.DebuffCategory[property] * 10;
-                chance += player.OtherBonus[property] * 10;
-                chance += player.AbilityBonus[property] * 10;
+                chance += living.BaseBuffBonusCategory[property] * 10;
+                chance += living.SpecBuffBonusCategory[property] * 10;
+                chance -= living.DebuffCategory[property] * 10;
+                chance += living.OtherBonus[property] * 10;
+                chance += living.AbilityBonus[property] * 10;
             }
             else if (living is GameNPC npc)
             {
                 chance += npc.ParryChance * 10;
-
-                // Bots take the NPC path; their parry buffs (none existed
-                // before Barrow Deflection) still have to count.
-                if (living is GameBot bot)
-                {
-                    chance += bot.BaseBuffBonusCategory[property] * 10;
-                    chance += bot.SpecBuffBonusCategory[property] * 10;
-                    chance -= bot.DebuffCategory[property] * 10;
-                }
 
                 if (living is NecromancerPet pet && pet.Brain is IControlledBrain)
                 {

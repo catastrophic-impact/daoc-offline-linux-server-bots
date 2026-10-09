@@ -16,7 +16,7 @@ namespace DOL.GS.Scripts
                 case eDamageType.Slash: return 40;// dmg reduction for melee dmg
                 case eDamageType.Crush: return 40;// dmg reduction for melee dmg
                 case eDamageType.Thrust: return 40;// dmg reduction for melee dmg
-                default: return 70;// dmg reduction for rest resists
+                default: return 55;// dmg reduction for rest resists (was 70; goal 3 tuning 2026-10-07, see the walk speed below)
             }
         }
         public override int MaxHealth
@@ -117,7 +117,10 @@ namespace DOL.AI.Brain
                     Body.ReturnToSpawnPoint(NpcMovementComponent.DEFAULT_WALK_SPEED);
                 }
                 else if(!Body.IsMoving)
-                    Body.WalkTo(_roamingPathPoints[_lastRoamIndex], (short)Util.Random(195, 250));
+                    // Goal 3 (owner permission to tune epic bosses, 2026-10-07): he walked his loop at 195-250, faster than
+                    // a raid runs (~191), so most of a 300-bot raid could never keep up (Caer Sidi run: 86% -> 60% in 15
+                    // minutes with 80+ bots idle and re-called). A walk the raid can follow keeps the chase.
+                    Body.WalkTo(_roamingPathPoints[_lastRoamIndex], (short)Util.Random(130, 160));
             }
 
             if (Body.InCombatInLast(60 * 1000) == false && Body.InCombatInLast(65 * 1000))

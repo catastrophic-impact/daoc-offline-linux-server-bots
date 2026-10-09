@@ -347,6 +347,13 @@ namespace DOL.GS
                 if (!_npcOwner.attackComponent.AttackState || _npcOwner.ObjectState is not eObjectState.Active)
                     return 0;
 
+                // Run 24: the checker (a player or a pet's player owner) can be gone by the time the timer ticks
+                // (NullReferenceException in TimerService); fall back to the forced LoS like "no checker" above.
+                if (_losChecker?.Out == null || _target == null)
+                {
+                    _attackAction.ForceLos();
+                    return 0;
+                }
                 _losChecker.Out.SendLosCheckRequest(_npcOwner, _target, _attackAction);
                 return LosCheckInterval;
             }

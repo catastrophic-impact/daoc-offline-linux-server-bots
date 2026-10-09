@@ -22,7 +22,7 @@ namespace DOL.GS
             {
                 "zombie magician" => 1.05,
                 "zombie guardian" => 0.90,
-                "zombie priest" => 0.85,
+                "zombie priest" or "ghastly healer" => 0.85,
                 "dullahan" or "cairn dullahan" => 1.20,
                 _ => 1.0
             };
@@ -38,7 +38,7 @@ namespace DOL.GS
         {
             base.SortSpells();
 
-            if (!RoleName.Equals("zombie priest", StringComparison.OrdinalIgnoreCase))
+            if (!IsHealerRole(RoleName))
                 return;
 
             HarmfulSpells?.RemoveAll(spell => spell.IsHarmful);
@@ -62,13 +62,16 @@ namespace DOL.GS
         /// </summary>
         public override double MaxHealthScalingFactor => GetRoleHealthScalingFactor(RoleName);
 
+        /// <summary>The support healer pet: "zombie priest", renamed "ghastly healer" with the badh model.</summary>
+        public static bool IsHealerRole(string roleName) => (roleName?.Trim().ToLowerInvariant()) is "zombie priest" or "ghastly healer";
+
         internal static double GetRoleHealthScalingFactor(string roleName) => (roleName?.Trim().ToLowerInvariant()) switch
         {
             "walking dead" => 0.65,
             "sturdy zombie" => 0.68,
             "zombie magician" => 0.50,
             "zombie guardian" => 0.84,
-            "zombie priest" => 0.55,
+            "zombie priest" or "ghastly healer" => 0.55,
             "dullahan" or "cairn dullahan" => 0.69,
             _ => 1.0
         };

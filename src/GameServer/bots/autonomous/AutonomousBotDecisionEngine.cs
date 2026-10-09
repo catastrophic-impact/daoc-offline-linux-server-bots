@@ -221,7 +221,7 @@ public static class AutonomousBotDecisionEngine
             return null;
         random ??= Random.Shared;
         if (environment != PveEnvironment.Dungeon)
-            return choices[random.Next(choices.Length)];
+            return SelectByLiveSpawns(choices, random);
 
         var regions = choices.GroupBy(camp => camp.RegionId)
             .Select(group => new
@@ -239,6 +239,34 @@ public static class AutonomousBotDecisionEngine
         }
 
         return regions[^1].Camps[^1];
+    }
+
+    /// <summary>
+    /// Outdoor camps are drawn in proportion to their live spawns, capped, so a
+    /// one-spawn spot is picked a sixth as often as a full camp. A uniform draw
+    /// sent Midgard's fresh bots to 1-2 spawn camps 61% of the time, where kills
+    /// run about 35 an hour against 43-48 at fuller camps. Bots spread in
+    /// proportion to what a camp can feed; distance and name still play no part.
+    /// </summary>
+    public const int OutdoorSpawnWeightCap = 6;
+
+    public static int OutdoorSpawnWeight(Camp camp) => Math.Clamp(camp.LiveMobCount, 1, OutdoorSpawnWeightCap);
+
+    private static Camp SelectByLiveSpawns(Camp[] choices, Random random)
+    {
+        int total = 0;
+        foreach (Camp camp in choices)
+            total += OutdoorSpawnWeight(camp);
+        int draw = random.Next(total);
+        foreach (Camp camp in choices)
+        {
+            int weight = OutdoorSpawnWeight(camp);
+            if (draw < weight)
+                return camp;
+            draw -= weight;
+        }
+
+        return choices[^1];
     }
 
     private static int DungeonCapacity(IEnumerable<Camp> camps)

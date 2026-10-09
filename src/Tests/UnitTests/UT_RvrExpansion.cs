@@ -205,8 +205,8 @@ public sealed class UT_RvrExpansion
         Assert.Multiple(() =>
         {
             Assert.That(AutonomousRvrEventLayer.OrdinaryAssaultCap, Is.EqualTo(128));
-            Assert.That(AutonomousRvrEventLayer.RelicAssaultCap, Is.EqualTo(192));
-            Assert.That(AutonomousRvrEventLayer.RelicCarrierRealmCap, Is.EqualTo(192));
+            Assert.That(AutonomousRvrEventLayer.RelicAssaultCap, Is.EqualTo(240));
+            Assert.That(AutonomousRvrEventLayer.RelicCarrierRealmCap, Is.EqualTo(240));
         });
     }
 

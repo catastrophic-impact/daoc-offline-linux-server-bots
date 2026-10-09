@@ -78,6 +78,31 @@ namespace DOL.GS.Commands
             member.MaxMana > 0 && member.Mana < member.MaxMana ||
             member.MaxEndurance > 0 && member.Endurance < member.MaxEndurance;
 
+        // /grind stays careful: everyone must be at full health and not casting before an
+        // automatic pull. Classes that keep chants or songs running (Paladin, Warden, Bard,
+        // Minstrel, Skald) never refill power/endurance completely and are casting their
+        // songs much of the time, which blocked /grind forever; for them a song cast does
+        // not count and power/endurance only need to reach this floor.
+        public const int SongUpkeepResourceFloorPercent = 75;
+
+        public static bool IsSongUpkeepClass(eCharacterClass characterClass) =>
+            BotBrain.IsClassicSongClass(characterClass) || characterClass is eCharacterClass.Paladin or eCharacterClass.Warden;
+
+        public static bool ReadyWithSongUpkeep(int health, int maxHealth, int mana, int maxMana, int endurance, int maxEndurance) =>
+            (maxHealth <= 0 || health >= maxHealth) &&
+            (maxMana <= 0 || mana * 100L >= maxMana * (long)SongUpkeepResourceFloorPercent) &&
+            (maxEndurance <= 0 || endurance * 100L >= maxEndurance * (long)SongUpkeepResourceFloorPercent);
+
+        public static bool BlocksAutomaticPull(GameLiving member)
+        {
+            if (member.IsCrowdControlled)
+                return true;
+            if (member is not GameBot bot || bot.CharacterClass == null || !IsSongUpkeepClass((eCharacterClass)bot.CharacterClass.ID))
+                return NeedsRecovery(member) || member.IsCasting;
+            return !ReadyWithSongUpkeep(member.Health, member.MaxHealth, member.Mana, member.MaxMana, member.Endurance, member.MaxEndurance) ||
+                member.IsCasting && member.castingComponent?.SpellHandler?.Spell?.IsPulsing != true && !BotSongTwistPolicy.HasMobileSongCast(bot);
+        }
+
         public static GameBot SelectPuller(IEnumerable<GameBot> companions) => companions
             .Where(bot => bot.IsAlive && !bot.IsCrowdControlled && bot.CharacterClass != null &&
                 BotPartyRoles.For((eCharacterClass)bot.CharacterClass.ID) != BotPartyRole.Support)
@@ -208,8 +233,8 @@ namespace DOL.GS.Commands
                 }
                 if (members.Any(member => !AtCamp(session, member)))
                 { session.ReadySince = 0; session.Detail = "Waiting for companions to revive/return to camp"; return; }
-                if (members.Any(member => NeedsRecovery(member) || member.IsCasting || member.IsCrowdControlled))
-                { session.ReadySince = 0; session.Detail = "Resting/healing/buffing — waiting for full HP, power and endurance"; return; }
+                if (members.Any(BlocksAutomaticPull))
+                { session.ReadySince = 0; session.Detail = "Resting/healing/buffing — waiting for full HP, power and endurance (75% for chanters and singers)"; return; }
                 GameBot puller = SelectPuller(members.OfType<GameBot>());
                 if (puller == null)
                 { session.ReadySince = 0; session.Detail = "Waiting for a tank or attacker (support classes will not pull)"; return; }

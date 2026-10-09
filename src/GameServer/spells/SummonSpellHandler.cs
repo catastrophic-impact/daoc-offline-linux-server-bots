@@ -74,34 +74,33 @@ namespace DOL.GS.Spells
 		{
 			Point2D point = Caster.GetPointFromHeading(Caster.Heading, 64);
 			Zone zone = Caster.CurrentRegion.GetZone(point.X, point.Y);
-
-			if (zone.IsPathfindingEnabled)
-			{
-				EDtPolyFlags[] filters = PathfindingProvider.Instance.DefaultFilters;
-				Vector3? closestPoint = PathfindingProvider.Instance.GetClosestPoint(zone, new(point.X, point.Y, Caster.Z), 32f, 32f, 64f, filters);
-
-				if (closestPoint.HasValue && PathfindingProvider.Instance.HasLineOfSight(zone, closestPoint.Value, new(Caster.X, Caster.Y, Caster.Z), filters))
-				{
-					x = (int) Math.Round(closestPoint.Value.X);
-					y = (int) Math.Round(closestPoint.Value.Y);
-					z = (int) Math.Round(closestPoint.Value.Z);
-				}
-				else
-				{
-					x = Caster.X;
-					y = Caster.Y;
-					z = Caster.Z;
-				}
-			}
-			else
-			{
-				x = point.X;
-				y = point.Y;
-				z = Caster.Z;
-			}
-
+			(x, y, z) = ChoosePetSpot(zone, point, Caster.X, Caster.Y, Caster.Z);
 			heading = (ushort) ((Caster.Heading + 2048) % 4096);
 			region = Caster.CurrentRegion;
+		}
+
+		/// <summary>
+		/// The pet appears 64 units in front of its owner, on the walkable floor when the zone has a
+		/// navmesh. When that spot is off the map (no zone there, e.g. an owner standing at a zone's
+		/// outer edge) or not on reachable floor, the pet appears on top of its owner instead. An
+		/// off-map spot used to throw, and the casting service then removed the caster from the
+		/// world, so a gamebot reloaded at that spot was kicked again on every summon.
+		/// </summary>
+		public static (int X, int Y, int Z) ChoosePetSpot(Zone zone, Point2D ahead, int ownerX, int ownerY, int ownerZ)
+		{
+			if (zone == null)
+				return (ownerX, ownerY, ownerZ);
+
+			if (!zone.IsPathfindingEnabled)
+				return (ahead.X, ahead.Y, ownerZ);
+
+			EDtPolyFlags[] filters = PathfindingProvider.Instance.DefaultFilters;
+			Vector3? closestPoint = PathfindingProvider.Instance.GetClosestPoint(zone, new(ahead.X, ahead.Y, ownerZ), 32f, 32f, 64f, filters);
+
+			if (closestPoint.HasValue && PathfindingProvider.Instance.HasLineOfSight(zone, closestPoint.Value, new(ownerX, ownerY, ownerZ), filters))
+				return ((int) Math.Round(closestPoint.Value.X), (int) Math.Round(closestPoint.Value.Y), (int) Math.Round(closestPoint.Value.Z));
+
+			return (ownerX, ownerY, ownerZ);
 		}
 
 		protected virtual GameSummonedPet GetGamePet(INpcTemplate template)

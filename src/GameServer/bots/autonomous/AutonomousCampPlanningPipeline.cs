@@ -123,7 +123,7 @@ namespace DOL.GS
                     if (actor is not GameNPC npc || npc.ObjectState != GameObject.eObjectState.Active ||
                         !npc.IsAlive || npc.CurrentZone == null || !IsExperienceMonster(npc) ||
                         npc.Name != npc.Name.ToLowerInvariant() ||
-                        AutonomousAuditedCampPolicy.IsBotExcludedSpawn(npc.InternalID)) continue;
+                        AutonomousAuditedCampPolicy.IsBotExcludedNpc(npc)) continue;
                     AutonomousDungeonGoalCatalog.Point point = null;
                     if (npc.CurrentZone.IsDungeon) AutonomousDungeonGoalCatalog.TryGet(npc, out point);
                     monsters.Add(new(npc.InternalID ?? string.Empty, npc.Name, npc.X, npc.Y, npc.Z, npc.EffectiveLevel,

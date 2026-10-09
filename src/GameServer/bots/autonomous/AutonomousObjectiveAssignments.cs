@@ -16,6 +16,8 @@ public enum eAutonomousObjectiveKind
     SoloPve,
     GroupPve,
     RvR,
+    // Roam and siege inside the battleground of the bot's level bracket (levels 15-35).
+    Battleground,
 }
 
 public enum eAutonomousPveCompletionMode
@@ -40,7 +42,7 @@ public static class AutonomousObjectiveAssignments
     private static long _nextRebalanceTick;
     private static long _epoch;
 
-    public readonly record struct Allocation(int SoloPve, int GroupPve, int RvR);
+    public readonly record struct Allocation(int SoloPve, int GroupPve, int RvR, int Battlegrounds = 0);
     public readonly record struct BetweenTaskPlan(bool Train, bool Unload);
 
     public static BetweenTaskPlan RollBetweenTaskPlan(bool canSpendPoints, bool backpackFull, double trainRoll, double unloadRoll) =>
@@ -95,6 +97,7 @@ public static class AutonomousObjectiveAssignments
         // Diagnostic count only; cannot finish or shorten a task.
         record.ObjectivePveKills++;
         bot.MarkAutonomousStateDirty();
+        AutonomousCampDangerBench.RecordKill(record.CurrentCampId);
     }
 
     public static bool HasActiveRvrTenure(OfflineWorldBotRecord record, DateTime utcNow)
@@ -161,27 +164,44 @@ public static class AutonomousObjectiveAssignments
     public static Allocation TargetForPopulation(int count, bool levelFifty)
     {
         var weights = AutonomousBotGoalPolicy.Settings.ForLevel(levelFifty ? 50 : 20);
-        return Allocate(count, weights.SoloPve / 100d, weights.GroupPve / 100d, weights.RvR / 100d);
+        return Allocate(count, weights.SoloPve / 100d, weights.GroupPve / 100d, weights.RvR / 100d, weights.Battlegrounds / 100d);
     }
 
     /// <summary>Below level 20 only the configured solo/group weights are used.</summary>
     public static Allocation TargetForLowLevelPopulation(int count)
     {
         var weights = AutonomousBotGoalPolicy.Settings.Levels1To19;
-        return Allocate(count, weights.SoloPve / 100d, weights.GroupPve / 100d, 0);
+        return Allocate(count, weights.SoloPve / 100d, weights.GroupPve / 100d, 0, weights.Battlegrounds / 100d);
     }
 
-    private static Allocation Allocate(int count, double soloWeight, double groupWeight, double rvrWeight)
+    /// <summary>
+    /// Battleground slots can only go to bots whose level fits a bracket (levels 15-35);
+    /// the share the rest of the band can't use is handed back to solo/group PvE in their ratio.
+    /// </summary>
+    public static Allocation LimitBattlegrounds(Allocation target, int eligible)
+    {
+        int surplus = target.Battlegrounds - Math.Clamp(eligible, 0, target.Battlegrounds);
+        if (surplus <= 0) return target;
+        int pve = target.SoloPve + target.GroupPve;
+        int toSolo = pve == 0 ? surplus : (int)Math.Round(surplus * (double)target.SoloPve / pve);
+        return target with { SoloPve = target.SoloPve + toSolo, GroupPve = target.GroupPve + surplus - toSolo,
+            Battlegrounds = target.Battlegrounds - surplus };
+    }
+
+    public static bool CanTakeBattleground(GameBot bot) =>
+        bot != null && AutonomousBotGoalPolicy.Allows(bot.Level, eAutonomousObjectiveKind.Battleground);
+
+    private static Allocation Allocate(int count, double soloWeight, double groupWeight, double rvrWeight, double battlegroundWeight = 0)
     {
         count = Math.Max(0, count);
-        double[] desired = { count * soloWeight, count * groupWeight, count * rvrWeight };
+        double[] desired = { count * soloWeight, count * groupWeight, count * rvrWeight, count * battlegroundWeight };
         int[] target = desired.Select(value => (int)Math.Floor(value)).ToArray();
         foreach (int index in Enumerable.Range(0, target.Length)
                      .OrderByDescending(index => desired[index] - target[index])
                      .ThenBy(index => index)
                      .Take(count - target.Sum()))
             target[index]++;
-        return new Allocation(target[0], target[1], target[2]);
+        return new Allocation(target[0], target[1], target[2], target[3]);
     }
 
     /// <summary>
@@ -271,6 +291,7 @@ public static class AutonomousObjectiveAssignments
                 Allocation target = bucket.Key.Band == 0
                     ? TargetForLowLevelPopulation(members.Length)
                     : TargetForPopulation(members.Length, bucket.Key.Band == 50);
+                target = LimitBattlegrounds(target, members.Count(CanTakeBattleground));
                 int currentRvr = members.Count(bot => Is(bot, eAutonomousObjectiveKind.RvR));
                 foreach (GameBot bot in members.Where(bot => bot.Group == null &&
                              Is(bot, eAutonomousObjectiveKind.GroupPve) &&
@@ -288,7 +309,7 @@ public static class AutonomousObjectiveAssignments
                     if (useRvr) currentRvr++;
                     DOL.Logging.LoggerManager.Create(typeof(AutonomousObjectiveAssignments)).Warn(
                         $"AUTONOMOUS_GROUP_MATCHMAKING_TIMEOUT bot=\"{bot.Name}\" id={bot.DatabaseID} " +
-                        $"realm={bot.Realm} level={bot.Level} waitedMinutes=20 fallback={fallback}");
+                        $"realm={GlobalConstants.RealmToName(bot.Realm)} level={bot.Level} waitedMinutes=20 fallback={fallback}");
                     Assign(bot, fallback, bucket.Key, ++_epoch);
                     bot.PersistentRecord.CurrentCampId = string.Empty;
                     bot.PersistentRecord.TargetName = string.Empty;
@@ -309,13 +330,25 @@ public static class AutonomousObjectiveAssignments
                     groupOwned.Contains(bot) && !Is(bot, eAutonomousObjectiveKind.RvR)).ToArray();
                 int assignedSolo = lockedPve.Count(bot => Parse(bot.PersistentRecord.ObjectiveKind) == eAutonomousObjectiveKind.SoloPve);
                 int assignedGroup = lockedPve.Count(bot => Parse(bot.PersistentRecord.ObjectiveKind) == eAutonomousObjectiveKind.GroupPve);
+                int assignedBattleground = lockedPve.Count(bot => Parse(bot.PersistentRecord.ObjectiveKind) == eAutonomousObjectiveKind.Battleground);
                 int assignedRvr = lockedRvr.Length;
+                // A battleground slot is drawn with the same odds as the remaining solo/group need.
+                bool TakesBattleground(GameBot bot, int otherNeeded)
+                {
+                    int needed = Math.Max(0, target.Battlegrounds - assignedBattleground);
+                    return needed > 0 && CanTakeBattleground(bot) && Random.Shared.Next(needed + Math.Max(0, otherNeeded)) < needed;
+                }
                 foreach (GameBot bot in members.Where(bot => !groupOwned.Contains(bot) && !HasActiveRvrTenure(bot.PersistentRecord, utcNow) &&
                                                               !HasActivePveAssignment(bot.PersistentRecord, utcNow) &&
                                                               !IsRvrEligible(bot.PersistentRecord, utcNow)))
                 {
-                    eAutonomousObjectiveKind kind = ChoosePveObjective(target, assignedSolo, assignedGroup);
-                    if (kind == eAutonomousObjectiveKind.SoloPve)
+                    eAutonomousObjectiveKind kind = TakesBattleground(bot,
+                        Math.Max(0, target.SoloPve - assignedSolo) + Math.Max(0, target.GroupPve - assignedGroup))
+                        ? eAutonomousObjectiveKind.Battleground
+                        : ChoosePveObjective(target, assignedSolo, assignedGroup);
+                    if (kind == eAutonomousObjectiveKind.Battleground)
+                        assignedBattleground++;
+                    else if (kind == eAutonomousObjectiveKind.SoloPve)
                         assignedSolo++;
                     else
                         assignedGroup++;
@@ -332,6 +365,8 @@ public static class AutonomousObjectiveAssignments
                     int groupNeeded = Math.Max(0, target.GroupPve - assignedGroup);
                     if (rvrNeeded > 0 && Random.Shared.Next(rvrNeeded + soloNeeded + groupNeeded) < rvrNeeded)
                         kind = eAutonomousObjectiveKind.RvR;
+                    else if (TakesBattleground(bot, soloNeeded + groupNeeded))
+                        kind = eAutonomousObjectiveKind.Battleground;
                     else if (AutonomousBotGoalPolicy.IsConfigured && rvrNeeded + soloNeeded + groupNeeded == 0)
                         kind = AutonomousBotGoalPolicy.Choose(bot.Level);
                     else
@@ -342,6 +377,7 @@ public static class AutonomousObjectiveAssignments
                         case eAutonomousObjectiveKind.SoloPve: assignedSolo++; break;
                         case eAutonomousObjectiveKind.GroupPve: assignedGroup++; break;
                         case eAutonomousObjectiveKind.RvR: assignedRvr++; break;
+                        case eAutonomousObjectiveKind.Battleground: assignedBattleground++; break;
                     }
                     Assign(bot, kind, bucket.Key, _epoch);
                 }
@@ -387,6 +423,20 @@ public static class AutonomousObjectiveAssignments
         bot.PersistentRecord.CurrentCampId = string.Empty;
         bot.PersistentRecord.TargetName = string.Empty;
         bot.PersistentRecord.TravelDestination = string.Empty;
+        bot.PersistentRecord.ObjectivePhase = reason;
+        bot.MarkAutonomousStateDirty();
+        AutonomousBotStatusPersistence.Queue(bot);
+    }
+
+    /// <summary>Ends a battleground tour early (out-levelled, or no teleporter reachable) with a new non-battleground goal.</summary>
+    public static void EndBattlegroundTour(GameBot bot, string reason)
+    {
+        if (bot?.PersistentRecord == null || !Is(bot, eAutonomousObjectiveKind.Battleground)) return;
+        eAutonomousObjectiveKind next = AutonomousBotGoalPolicy.IsConfigured
+            ? AutonomousBotGoalPolicy.Choose(bot.Level, excludeBattlegrounds: true)
+            : eAutonomousObjectiveKind.SoloPve;
+        Assign(bot, next, (bot.Realm, bot.Level >= 50 ? 50 : bot.Level >= 20 ? 20 : 0), GameLoop.GameLoopTime);
+        bot.PersistentRecord.CurrentCampId = bot.PersistentRecord.TargetName = bot.PersistentRecord.TravelDestination = string.Empty;
         bot.PersistentRecord.ObjectivePhase = reason;
         bot.MarkAutonomousStateDirty();
         AutonomousBotStatusPersistence.Queue(bot);
@@ -460,7 +510,8 @@ public static class AutonomousObjectiveAssignments
         if (AutonomousBotGoalPolicy.IsConfigured && !forcedRaid)
             kind = AutonomousBotGoalPolicy.EnsureAllowed(bot.Level, kind);
         OfflineWorldBotRecord record = bot.PersistentRecord;
-        string assignment = $"{bucket.Realm.ToString().ToLowerInvariant()}-{bucket.Band}-{epoch}-{kind}";
+        // eRealm.Albion and _FirstPlayerRealm share a value; ToString() labelled Albion assignments "_firstplayerrealm-...".
+        string assignment = $"{GlobalConstants.RealmToName(bucket.Realm).ToLowerInvariant()}-{bucket.Band}-{epoch}-{kind}";
         if (string.Equals(record.ObjectiveKind, kind.ToString(), StringComparison.Ordinal) &&
             string.Equals(record.ObjectiveAssignmentId, assignment, StringComparison.Ordinal))
             return;
@@ -490,6 +541,7 @@ public static class AutonomousObjectiveAssignments
         {
             eAutonomousObjectiveKind.GroupPve => "Awaiting a party; the formed group will share one task timer",
             eAutonomousObjectiveKind.SoloPve => $"Solo timed grind ends {record.ObjectiveExpiresUtc}",
+            eAutonomousObjectiveKind.Battleground => $"Battleground tour ends {record.ObjectiveExpiresUtc}",
             _ => record.ObjectiveProgress,
         };
         long waitKey = bot.DatabaseID > 0 ? bot.DatabaseID : bot.ObjectID;

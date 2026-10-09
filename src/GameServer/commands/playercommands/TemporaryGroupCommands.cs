@@ -84,7 +84,7 @@ namespace DOL.GS.Commands
                 .Select(entry => $"[{entry.CharacterClass}]")
                 .ToArray();
             string links = string.Join('\n', choices.Chunk(4).Select(chunk => string.Join("   ", chunk)));
-            return $"Choose a {realm} companion to add to your group:\n\n{links}\n\nClick one class name.";
+            return $"Choose a {GlobalConstants.RealmToName(realm)} companion to add to your group:\n\n{links}\n\nClick one class name.";
         }
 
         internal static bool Open(GamePlayer player)
@@ -171,7 +171,7 @@ namespace DOL.GS.Commands
             var entries = TemporaryGroupClassCatalog.ForRealm(client.Player.Realm)
                 .Select(entry => $"{entry.CharacterClass} ({entry.Role})")
                 .ToArray();
-            DisplayMessage(client, $"{client.Player.Realm} Classic + SI classes:");
+            DisplayMessage(client, $"{GlobalConstants.RealmToName(client.Player.Realm)} Classic + SI classes:");
             foreach (string line in entries.Chunk(4).Select(chunk => string.Join("  |  ", chunk)))
                 DisplayMessage(client, line);
             DisplayMessage(client, "Use /spawn <class name> to create a temporary same-level party helper.");
@@ -200,7 +200,7 @@ namespace DOL.GS.Commands
             string requestedClass = string.Join(' ', args.Skip(1));
             if (!TemporaryGroupClassCatalog.TryResolve(player.Realm, requestedClass, out eCharacterClass characterClass))
             {
-                DisplayMessage(client, $"'{requestedClass}' is not a Classic + SI {player.Realm} class. Type /classes.");
+                DisplayMessage(client, $"'{requestedClass}' is not a Classic + SI {GlobalConstants.RealmToName(player.Realm)} class. Type /classes.");
                 return;
             }
 

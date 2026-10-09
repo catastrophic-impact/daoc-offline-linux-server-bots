@@ -14,6 +14,10 @@ public sealed partial class AutonomousWorldBotController
     private Vector3? _keepTravelLastPosition;
     private Vector3[] _keepTravelPoints;
     private RvrPlanningNavigation _keepPlanning;
+    private Vector3? _keepHop;
+    private Vector3 _keepHopFor, _keepStallPosition, _keepStallAnchor;
+    private long _keepStallSince;
+    private int _keepTravelStalls;
 
     private static long KeepTravelGeometry(Region region, Zone destination, string targetId)
     {
@@ -101,7 +105,7 @@ public sealed partial class AutonomousWorldBotController
                 bot.StopMovingOnPath(); bot.StopMoving();
                 SetRvrStatus(bot, "Keep route retry", destination.MonsterName,
                     $"{failure}; retaining the siege and backing off before retrying");
-                Log.Warn($"RVR_KEEP_ROUTE_FAILED bot=\"{bot.Name}\" id={bot.DatabaseID} realm={bot.Realm} " +
+                Log.Warn($"RVR_KEEP_ROUTE_FAILED bot=\"{bot.Name}\" id={bot.DatabaseID} realm={GlobalConstants.RealmToName(bot.Realm)} " +
                     $"target=\"{destination.Id}\" region={bot.CurrentRegionID} from={current} queries={queries} " +
                     $"reason=\"{failure}\" retryMs={_keepTravelRetry-now}");
                 return true;
@@ -126,6 +130,9 @@ public sealed partial class AutonomousWorldBotController
             return false;
         }
         Vector3 next = _keepTravelPoints[_keepTravelIndex];
+        if (HandleKeepTravelStall(bot, destination, current, next, now))
+            return true;
+        Vector3 leg = KeepTravelLeg(bot, current, next);
         var zone = bot.CurrentRegion.GetZone((int)next.X, (int)next.Y);
         if (zone != bot.CurrentZone && _keepTravelIndex > 0 &&
             Vector3.DistanceSquared(current, next) <= 256 * 256)
@@ -134,14 +141,87 @@ public sealed partial class AutonomousWorldBotController
             // No teleport, wall shortcut, or fresh cross-region chord.
             if (!bot.IsMoving) bot.WalkTo(next, bot.MaxSpeed);
         }
-        else if (!IssuePath(bot, next, preciseArrival: true))
+        else if (!IssuePath(bot, leg, preciseArrival: leg == next))
         {
+            _keepHop = null;
             _keepTravelPoints = null; _keepPlanning = null;
             _keepTravelRetry = now + 30_000;
             return true;
         }
         SetRvrStatus(bot, "Traveling to keep", destination.MonsterName,
-            $"Following validated road segment {_keepTravelIndex+1}/{_keepTravelPoints.Length}");
+            $"Following validated road segment {_keepTravelIndex+1}/{_keepTravelPoints.Length}" +
+            (leg == next ? string.Empty : " in a shorter leg"));
         return true;
+    }
+
+    /// <summary>Very long same-zone legs are walked in navmesh-proven chunks.</summary>
+    private Vector3 KeepTravelLeg(GameBot bot, Vector3 current, Vector3 next)
+    {
+        if (_keepHop.HasValue && (_keepHopFor != next || Vector3.DistanceSquared(current, _keepHop.Value) <= 300 * 300))
+            _keepHop = null;
+        if (_keepHop.HasValue)
+            return _keepHop.Value;
+        Zone zone = bot.CurrentZone;
+        if (!KeepTravelStallPolicy.NeedsShorterLeg(current, next) || zone == null ||
+            bot.CurrentRegion.GetZone((int)next.X, (int)next.Y) != zone ||
+            !KeepTravelStallPolicy.TryShorterLeg(PathfindingProvider.Instance, zone, current, next, out Vector3 hop))
+            return next;
+        _keepHop = hop;
+        _keepHopFor = next;
+        return hop;
+    }
+
+    /// <summary>
+    /// A keep traveller with no progress for a minute replans from where it stands
+    /// in a shorter leg; three stalls at one spot release the siege job and back off
+    /// instead of idling until the 15-minute watchdog sends the bot home.
+    /// </summary>
+    private bool HandleKeepTravelStall(GameBot bot, CampDestination destination, Vector3 current, Vector3 next, long now)
+    {
+        if (_keepStallSince == 0 || Vector3.DistanceSquared(current, _keepStallPosition) >
+                KeepTravelStallPolicy.StallRadius * KeepTravelStallPolicy.StallRadius)
+        {
+            _keepStallPosition = current;
+            _keepStallSince = now;
+            return false;
+        }
+        if (!KeepTravelStallPolicy.IsStalled(now - _keepStallSince, bot.InCombat || bot.IsAttacking || bot.IsCasting,
+                bot.IsOnStableMasterRoute))
+            return false;
+
+        _keepTravelStalls = _keepTravelStalls > 0 && KeepTravelStallPolicy.SameSpot(_keepStallAnchor, current)
+            ? _keepTravelStalls + 1 : 1;
+        if (_keepTravelStalls == 1)
+            _keepStallAnchor = current;
+        _keepStallSince = now;
+        _keepHop = null;
+        Log.Warn($"RVR_KEEP_TRAVEL_STALL bot=\"{bot.Name}\" id={bot.DatabaseID} realm={GlobalConstants.RealmToName(bot.Realm)} target=\"{destination.Id}\" " +
+                 $"region={bot.CurrentRegionID} from={(int)current.X},{(int)current.Y},{(int)current.Z} " +
+                 $"next={(int)next.X},{(int)next.Y},{(int)next.Z} segment={_keepTravelIndex + 1}/{_keepTravelPoints?.Length ?? 0} " +
+                 $"moving={bot.IsMoving} stalls={_keepTravelStalls}");
+        bot.StopMovingOnPath();
+        bot.StopMoving();
+        bot.ForcePathReplot();
+        ResetRouteOrderState();
+        if (_keepTravelStalls >= KeepTravelStallPolicy.StallsBeforeBackoff)
+        {
+            _keepTravelStalls = 0;
+            _keepTravelPoints = null;
+            _keepPlanning = null;
+            _keepTravelRetry = now + KeepTravelStallPolicy.BackoffMilliseconds;
+            if (_siegeJobKeep != null)
+                ReleaseSiegeJob(bot);
+            SetRvrStatus(bot, "Keep route stalled", destination.MonsterName,
+                "No progress at the same spot three times; replanning after a short back-off");
+            return true;
+        }
+        Zone zone = bot.CurrentZone;
+        if (zone != null && bot.CurrentRegion.GetZone((int)next.X, (int)next.Y) == zone &&
+            KeepTravelStallPolicy.TryShorterLeg(PathfindingProvider.Instance, zone, current, next, out Vector3 hop))
+        {
+            _keepHop = hop;
+            _keepHopFor = next;
+        }
+        return false;
     }
 }

@@ -132,11 +132,46 @@ namespace DOL.GS
             if (focus != null && !CompanionEngagementMode.Allows(helper, focus)) focus = null;
             if (focus == null && defensive)
                 focus = SelectNearby(helper, leader.GetNPCsInRadius(CompanionEngagementMode.DefensiveRadius), BotSiegeRuntime.Visible);
+            if (focus == null && FrontierRaidAggro(leader))
+                focus = SelectRoamer(helper, leader.GetNPCsInRadius((ushort)FrontierRaidAggroRadius(defensive)), BotSiegeRuntime.Visible);
             if (focus == null) return;
             foreach (GameLiving member in leader.Group.GetMembersInTheGroup())
                 if (member is GameBot bot && Leader(bot) == leader && PlayerLedPullCoordinator.Available(bot, leader) &&
-                    bot.IsWithinRadius(focus, BotBrain.GROUP_DEFENSE_ASSIST_RADIUS) && bot.Brain is BotBrain brain)
+                    bot.IsWithinRadius(focus, BotBrain.GROUP_DEFENSE_ASSIST_RADIUS) && CompanionRaidSiege.MayAssist(bot, focus) &&
+                    bot.Brain is BotBrain brain)
                     brain.AssistPlayerAttack(focus);
+        }
+
+        // Owner 2026-10-07: in the frontier a /raid 40 or /raid 80 engages enemy roamers near the player on its own,
+        // without waiting for the player to attack or be attacked, but never far from the player. Its range is separate
+        // from the PvE engagement rules: /aggressive gives the long range, /defensive a smaller one that is still far
+        // beyond the PvE DefensiveRadius. The leash stays: a raid bot chasing beyond
+        // TemporaryCompanionRecovery.MaximumLeaderDistance is recalled once the player's own area is quiet (see
+        // TemporaryCompanionRecovery.FrontierChaseLeash). Only enemy-realm gamebots are affected; PvE engagement is unchanged.
+        // (Raids are level 50 only, so battlegrounds never apply.)
+        public const int FrontierRaidAggressiveRadius = 2000;
+        public const int FrontierRaidDefensiveRadius = 1000;
+
+        public static int FrontierRaidAggroRadius(bool defensive) =>
+            defensive ? FrontierRaidDefensiveRadius : FrontierRaidAggressiveRadius;
+
+        /// <summary>An enemy roamer the raid may fight in the frontier even under /defensive's short PvE range.</summary>
+        public static bool FrontierRoamerInRange(GamePlayer leader, GameLiving target, bool defensive) =>
+            FrontierRaidAggro(leader) && Enemy(leader, target) && target.CurrentRegionID == leader.CurrentRegionID &&
+            leader.IsWithinRadius(target, FrontierRaidAggroRadius(defensive));
+
+        public static bool FrontierRaidAggro(GamePlayer leader) =>
+            leader?.Group?.IsCompanionRaid == true && leader.CurrentZone?.IsRvR == true;
+
+        public static GameLiving SelectRoamer(GameBot helper, IEnumerable<GameNPC> candidates, Func<GameLiving, GameLiving, bool> visible)
+        {
+            GamePlayer leader = Leader(helper);
+            if (!FrontierRaidAggro(leader)) return null;
+            int radius = FrontierRaidAggroRadius(CompanionEngagementMode.DefensiveLeader(helper) != null);
+            return candidates.Where(t => Live(leader, t) && !t.IsStealthed &&
+                    leader.IsWithinRadius(t, radius) &&
+                    GameServer.ServerRules.IsAllowedToAttack(helper, t, true) && visible(leader, t))
+                .OrderBy(leader.GetDistanceTo).FirstOrDefault();
         }
 
         public static GameLiving SelectNearby(GameBot helper, IEnumerable<GameNPC> candidates, Func<GameLiving, GameLiving, bool> visible)

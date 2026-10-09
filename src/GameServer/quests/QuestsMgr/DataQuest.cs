@@ -1570,7 +1570,10 @@ namespace DOL.GS.Quests
 
                     // NOTE: Original plan was to support more than one template per step, but only a single template is supported at this time
 
-					if (!string.IsNullOrEmpty(StepItemTemplate))
+					// A delivery step's item is handed over when the step begins and taken by its target; giving it again on
+					// completion (as the header documents, "except Delivery") handed players a second copy (classic quests,
+					// owner test 2026-10-07).
+					if (!string.IsNullOrEmpty(StepItemTemplate) && StepType is not (eStepType.Deliver or eStepType.DeliverFinish))
 					{
 						stepTemplates.Add(StepItemTemplate);
 					}
@@ -2830,6 +2833,17 @@ namespace DOL.GS.Quests
 		/// <summary>
 		/// Finish the quest and update the player quest list
 		/// </summary>
+		/// <summary>
+		/// Classic quests (goal 10): a scripted trigger (an item used at a place, a place reached, an item obtained, another
+		/// quest finished) completes the current step: it advances, or finishes the quest on a finish step.
+		/// </summary>
+		public bool AdvanceByScript(GameObject source)
+		{
+			if (m_questPlayer == null || Step <= 0)
+				return false;
+			return (int)StepType % 2 == 1 ? FinishQuest(source, true) : AdvanceQuestStep(source);
+		}
+
 		public virtual bool FinishQuest(GameObject obj, bool checkCustomStep)
 		{
 			if (m_questPlayer == null || m_charQuest == null || m_charQuest.IsPersisted == false)

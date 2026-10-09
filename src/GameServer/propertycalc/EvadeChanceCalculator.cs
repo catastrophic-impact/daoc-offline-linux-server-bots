@@ -16,16 +16,19 @@ namespace DOL.GS.PropertyCalc
         {
             int chance = 0;
 
-            if (living is GamePlayer player)
+            // Players and GameBots share the player formula: the class Evade
+            // ability level, quickness, dexterity, items and buffs.
+            if (PlayerDefenseFormula.UsesPlayerDefense(living))
             {
-                if (player.HasAbility(Abilities.Evade))
-                    chance += (900 + player.Quickness + player.Dexterity) * player.GetAbilityLevel(Abilities.Evade) * 5 / 100;
+                if (living.HasAbility(Abilities.Evade))
+                    chance += PlayerDefenseFormula.Evade(living.GetModified(eProperty.Quickness),
+                        living.GetModified(eProperty.Dexterity), living.GetAbilityLevel(Abilities.Evade));
 
-                chance += player.BaseBuffBonusCategory[property] * 10;
-                chance += player.SpecBuffBonusCategory[property] * 10;
-                chance -= player.DebuffCategory[property] * 10;
-                chance += player.OtherBonus[property] * 10;
-                chance += player.AbilityBonus[property] * 10;
+                chance += living.BaseBuffBonusCategory[property] * 10;
+                chance += living.SpecBuffBonusCategory[property] * 10;
+                chance -= living.DebuffCategory[property] * 10;
+                chance += living.OtherBonus[property] * 10;
+                chance += living.AbilityBonus[property] * 10;
             }
             else if (living is GameNPC npc)
                 chance += npc.AbilityBonus[property] * 10 + npc.EvadeChance * 10;

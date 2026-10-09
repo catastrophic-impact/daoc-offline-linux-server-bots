@@ -133,7 +133,7 @@ namespace DOL.GS
                 throw new ArgumentOutOfRangeException(nameof(realm));
             ClassChoice choice = ActiveChoices(realmChoices).FirstOrDefault(entry => entry.CharacterClass == characterClass);
             if (choice == null)
-                throw new ArgumentException($"{characterClass} is not a Classic + SI {realm} class.", nameof(characterClass));
+                throw new ArgumentException($"{characterClass} is not a Classic + SI {GlobalConstants.RealmToName(realm)} class.", nameof(characterClass));
             if (gender is not eGender.Male and not eGender.Female)
                 throw new ArgumentOutOfRangeException(nameof(gender));
 
@@ -194,7 +194,7 @@ namespace DOL.GS
                     return candidate;
             }
 
-            throw new InvalidOperationException($"Unable to produce another unique {realm} {gender} bot name.");
+            throw new InvalidOperationException($"Unable to produce another unique {GlobalConstants.RealmToName(realm)} {gender} bot name.");
         }
 
         private static string Normalize(string name)

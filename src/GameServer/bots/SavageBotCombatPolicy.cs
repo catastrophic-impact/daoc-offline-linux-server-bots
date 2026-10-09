@@ -166,16 +166,28 @@ public static class SavageBotCombatPolicy
     public static bool ShouldUseEnduranceHeal(int healthPercent, int endurancePercent) =>
         healthPercent >= 75 && endurancePercent <= 30;
 
-    // A controlled player can choose exactly how much health to trade. Bots use
-    // the two offensive staples, then defensive buffs only with a healthy reserve.
+    // Each Savage buff lasts 15 seconds and costs 5% health. Bots kept up to four
+    // running, two even at 55% health: up to 40-80% health a minute, so level-50
+    // Savages killed at half the rate of Berserkers and Blademasters and died the
+    // most (Oct 3-5). Now: the damage and attack-speed staples from 70% health,
+    // evasion as well from 90%, resist buffs never, nothing below 70%.
+    public const int MinimumBuffHealthPercent = 70;
+    public const int ExtraBuffHealthPercent = 90;
+
     public static bool ShouldUseBuff(eSpellType type, int healthPercent, int activeBuffs)
     {
-        int limit = healthPercent >= 85 ? 4 : 2;
-        if (healthPercent < 55 || activeBuffs >= limit)
+        int limit = healthPercent >= ExtraBuffHealthPercent ? 3 : 2;
+        if (healthPercent < MinimumBuffHealthPercent || activeBuffs >= limit)
             return false;
 
         return BuffPriority(type) < limit;
     }
+
+    // Never pay health to finish a monster that is nearly dead.
+    public const int MinimumTargetHealthPercent = 35;
+
+    public static bool ShouldUseBuff(eSpellType type, int healthPercent, int activeBuffs, int level, int targetHealthPercent) =>
+        targetHealthPercent >= MinimumTargetHealthPercent && ShouldUseBuff(type, healthPercent, activeBuffs, level);
 
     public const int LowLevelSavageBuffLevel = 10;
 

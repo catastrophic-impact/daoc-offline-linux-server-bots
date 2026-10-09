@@ -985,7 +985,8 @@ namespace DOL.GS
             DbBattleground battleground = GameServer.KeepManager.GetBattleground(CurrentRegionID);
             if (battleground != null && (ePrivLevel) Client.Account.PrivLevel is ePrivLevel.Player)
             {
-                if (Level > battleground.MaxLevel || RealmLevel >= battleground.MaxRealmLevel)
+                // Level is the only battleground limit on this server (owner, 2026-10-07): no realm rank cap.
+                if (Level > battleground.MaxLevel)
                     GameServer.KeepManager.ExitBattleground(this);
             }
 
@@ -1452,7 +1453,7 @@ namespace DOL.GS
                     DbBattleground battleground = GameServer.KeepManager.GetBattleground(CurrentRegionID);
 
                     // Battlegrounds caps.
-                    if (Properties.BG_RELEASE_TO_PORTAL_KEEP && battleground != null && Level <= battleground.MaxLevel && RealmLevel <= battleground.MaxRealmLevel)
+                    if (Properties.BG_RELEASE_TO_PORTAL_KEEP && battleground != null && Level <= battleground.MaxLevel)
                         releaseCommand = eReleaseType.Battleground;
                     else
                         releaseCommand = eReleaseType.Bind;
@@ -5173,24 +5174,24 @@ namespace DOL.GS
             switch (ad.AttackResult)
             {
                 // is done in game living because of guard
-                //case eAttackResult.Blocked : Out.SendMessage(ad.Attacker.GetName(0, true) + " attacks you and you block the blow!", eChatType.CT_Missed, eChatLoc.CL_SystemWindow); break;
+                //case eAttackResult.Blocked : Out.SendMessage(AutonomousNameMask.NameFor(this, ad.Attacker, 0, true) + " attacks you and you block the blow!", eChatType.CT_Missed, eChatLoc.CL_SystemWindow); break;
                 case eAttackResult.Parried:
                     if (ad.Attacker is GameNPC)
                         Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Parry", ad.Attacker.GetName(0, true, Client.Account.Language, (ad.Attacker as GameNPC))) + " (" + /*GetParryChance()*/ad.ParryChance.ToString("0.0") + "%)", eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     else
-                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Parry", ad.Attacker.GetName(0, true)) + " (" + /*GetParryChance()*/ad.ParryChance.ToString("0.0") + "%)", eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Parry", AutonomousNameMask.NameFor(this, ad.Attacker, 0, true)) + " (" + /*GetParryChance()*/ad.ParryChance.ToString("0.0") + "%)", eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     break;
                 case eAttackResult.Evaded:
                     if (ad.Attacker is GameNPC)
                         Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Evade", ad.Attacker.GetName(0, true, Client.Account.Language, (ad.Attacker as GameNPC))) + " (" + /*GetEvadeChance()*/ad.EvadeChance.ToString("0.0") + "%)", eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     else
-                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Evade", ad.Attacker.GetName(0, true)) + " (" + /*GetEvadeChance()*/ad.EvadeChance.ToString("0.0") + "%)", eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Evade", AutonomousNameMask.NameFor(this, ad.Attacker, 0, true)) + " (" + /*GetEvadeChance()*/ad.EvadeChance.ToString("0.0") + "%)", eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     break;
                 case eAttackResult.Fumbled:
                     if (ad.Attacker is GameNPC)
                         Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Fumbled", ad.Attacker.GetName(0, true, Client.Account.Language, (ad.Attacker as GameNPC))), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     else
-                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Fumbled", ad.Attacker.GetName(0, true)), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Fumbled", AutonomousNameMask.NameFor(this, ad.Attacker, 0, true)), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     break;
                 case eAttackResult.Missed:
                     if (ad.AttackType == AttackData.eAttackType.Spell)
@@ -5198,7 +5199,7 @@ namespace DOL.GS
                     if (ad.Attacker is GameNPC)
                         Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Missed", ad.Attacker.GetName(0, true, Client.Account.Language, (ad.Attacker as GameNPC))) + " (" + Math.Min(ad.MissChance, 100).ToString("0.0") + "%)", eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     else
-                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Missed", ad.Attacker.GetName(0, true)), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+                        Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Missed", AutonomousNameMask.NameFor(this, ad.Attacker, 0, true)), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
                     break;
                 case eAttackResult.HitStyle:
                 case eAttackResult.HitUnstyled:
@@ -5212,7 +5213,7 @@ namespace DOL.GS
                     switch (ad.ArmorHitLocation)
                     {
                         //GamePlayer.Attack.Location.Feet:	feet
-                        // LanguageMgr.GetTranslation(Client.Account.Language, "", ad.Attacker.GetName(0, true))
+                        // LanguageMgr.GetTranslation(Client.Account.Language, "", AutonomousNameMask.NameFor(this, ad.Attacker, 0, true))
                         case eArmorSlot.TORSO: hitLocName = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Location.Torso"); break;
                         case eArmorSlot.ARMS: hitLocName = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Location.Arm"); break;
                         case eArmorSlot.HEAD: hitLocName = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.Location.Head"); break;
@@ -5243,12 +5244,12 @@ namespace DOL.GS
                     else
                     {
                         if (hitLocName != null)
-                            Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.HitsYour", ad.Attacker.GetName(0, true), hitLocName, ad.Damage, modmessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+                            Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.HitsYour", AutonomousNameMask.NameFor(this, ad.Attacker, 0, true), hitLocName, ad.Damage, modmessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
                         else
-                            Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.HitsYou", ad.Attacker.IsAlive ? ad.Attacker.GetName(0, true) : "A dead enemy", ad.Damage, modmessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+                            Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.HitsYou", ad.Attacker.IsAlive ? AutonomousNameMask.NameFor(this, ad.Attacker, 0, true) : "A dead enemy", ad.Damage, modmessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
 
                         if (ad.CriticalDamage > 0)
-                            Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.HitsYouCritical", ad.Attacker.GetName(0, true), ad.CriticalDamage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+                            Out.SendMessage(LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Attack.HitsYouCritical", AutonomousNameMask.NameFor(this, ad.Attacker, 0, true), ad.CriticalDamage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
                     }
 
                     break;
@@ -5842,12 +5843,12 @@ namespace DOL.GS
                     messageDistance = 0;
                     if (killingBlowByEnemyRealm)
                     {
-                        playerMessage = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Die.KilledByLocation", GetName(0, true), killer.GetName(1, false), location);
+                        playerMessage = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Die.KilledByLocation", GetName(0, true), AutonomousNameMask.NameFor(this, killer, 1, false), location);
                         publicMessage = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Die.KilledByLocation", GetName(0, true), killer.GetName(1, false), location);
                     }
                     else
                     {
-                        playerMessage = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Die.KilledBy", GetName(0, true), killer.GetName(1, false));
+                        playerMessage = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Die.KilledBy", GetName(0, true), AutonomousNameMask.NameFor(this, killer, 1, false));
                         publicMessage = LanguageMgr.GetTranslation(Client.Account.Language, "GamePlayer.Die.KilledBy", GetName(0, true), killer.GetName(1, false));
                     }
                 }
@@ -5909,7 +5910,7 @@ namespace DOL.GS
                 )
                     if (player == this)
                         player.Out.SendMessage(playerMessage, messageType, eChatLoc.CL_SystemWindow);
-                    else player.Out.SendMessage(publicMessage, messageType, eChatLoc.CL_SystemWindow);
+                    else player.Out.SendMessage(AutonomousNameMask.Masked(publicMessage, player, killer, 1, false), messageType, eChatLoc.CL_SystemWindow);
             }
 
             //Dead ppl. dismount ...
@@ -9971,7 +9972,7 @@ namespace DOL.GS
                 Specialization source = SkillBase.GetSpecialization("Epic Spells", false);
                 if (source != null)
                 {
-                    Specialization epicSpells = new CareerSpecialization(
+                    Specialization epicSpells = new DOL.GS.Quests.Hibernia.SluaghbinderEpicSpellsSpecialization(
                         source.KeyName, source.Name, source.Icon, source.ID)
                     {
                         LevelRequired = -3,
@@ -11065,6 +11066,28 @@ namespace DOL.GS
             }
         }
 
+        /// <summary>The player detection rules (see the PLAYER case of <see cref="CanDetect"/>) for a stealthed gamebot.</summary>
+        private bool CanDetectStealthedBot(GameBot bot)
+        {
+            if (bot.Realm == Realm || bot.Group != null && Group != null && bot.Group == Group)
+                return true;
+            if (effectListComponent.ContainsEffectForEffectType(eEffect.TrueSight))
+                return true;
+            int stealthLevel = Math.Min(50, bot.GetModifiedSpecLevel(Specs.Stealth));
+            int levelDiff = Math.Max(0, Level - stealthLevel);
+            bool camouflage = bot.effectListComponent.ContainsEffectForEffectType(eEffect.Camouflage);
+            bool vanish = bot.effectListComponent.ContainsEffectForEffectType(eEffect.Vanish);
+            if (vanish)
+                return false;
+            int range = HasAbility(Abilities.DetectHidden) && !bot.HasAbility(Abilities.DetectHidden) && !camouflage
+                ? levelDiff * 50 + 250
+                : levelDiff * 20 + 125;
+            if (HasAbilityType(typeof(AtlasOF_SeeHidden)) && bot.CharacterClass?.IsAssassin != true && !camouflage)
+                range = Math.Max(range, 2700 - 36 * stealthLevel);
+            range += BaseBuffBonusCategory[eProperty.Skill_Stealth];
+            return IsWithinRadius(bot, Math.Min(range, 1900));
+        }
+
         public virtual bool CanDetect(GameObject enemy)
         {
             if (!enemy.IsStealthed || Client.Account.PrivLevel > 1)
@@ -11183,6 +11206,11 @@ namespace DOL.GS
                 }
                 case eGameObjectType.NPC:
                 {
+                    // Owner 2026-10-07: a stealthed enemy gamebot showed as a ghost. In DAoC a stealthed player is fully
+                    // invisible to enemies outside detection range (allies see the ghostly outline); gamebots stand in
+                    // for players, so they get the player rules. Other stealthed NPCs are unchanged.
+                    if (enemy is GameBot stealthedBot)
+                        return CanDetectStealthedBot(stealthedBot);
                     // Custom feature to make stealthed NPCs actually invisible.
                     // Currently disabled.
                     return true;

@@ -254,7 +254,10 @@ public sealed class UT_AutonomousPetCombatPolicy
                 eCharacterClass.Sluaghbinder, eSpecType.SluaghbinderBane, petBuff), Is.False);
             Assert.That(AutonomousPetSupport.PetBuffActionCooldown(
                 eCharacterClass.Enchanter, eSpecType.SluaghbinderCovenant, petBuff, false),
-                Is.EqualTo(15_000), "Other pet classes keep their existing retry safety");
+                Is.EqualTo(nextActionMilliseconds), "Every pet class now buffs at the cast cadence out of combat");
+            Assert.That(AutonomousPetSupport.PetBuffActionCooldown(
+                eCharacterClass.Enchanter, eSpecType.SluaghbinderCovenant, petBuff, true),
+                Is.EqualTo(15_000), "Combat keeps the old spacing for every class");
         });
     }
 

@@ -28,6 +28,10 @@ namespace DOL.GS
 
         public static long SiegeSupplyBudget(bool playerResponse) => playerResponse ? 180_000L : 600_000L;
 
+        /// <summary>Siege crews get their engines on site (owner 2026-10-07: skips long shopping trips); the pre-march
+        /// kit purchase is kept behind this switch.</summary>
+        public const bool SyntheticSiegeEquipment = true;
+
         private bool PrepareSiegeResponseSupplies(GameBot bot, long now)
         {
             // Reserve against the destination, not the origin region: responders
@@ -35,13 +39,14 @@ namespace DOL.GS
             if (IsInFrontier(bot) || !_rvrSharedEvent || _rvrDestination == null ||
                 _siegePreSupplyKeep == _rvrDestination.Id || now < _siegeNextAttempt ||
                 !AutonomousSiegeJobs.Eligible(bot) ||
-                !AutonomousRvrEventLayer.IsTargetActive(_rvrDestination.Id, now)) return false;
+                !AutonomousRvrEventLayer.IsTargetActive(_rvrDestination.Id, now) || SyntheticSiegeEquipment) return false;
             var keep = GameServer.KeepManager.GetKeepsOfRegion(_rvrDestination.RegionId)
                 .FirstOrDefault(k => _rvrDestination.Id == $"rvr-keep-{k.KeepID}" && AutonomousRvrKeepPolicy.IsSiegeObjective(k));
             if (keep == null) return false;
             if (_siegeJobKeep != null && _siegeJobKeep != _rvrDestination.Id) ReleaseSiegeJob(bot);
-            if (!AutonomousSiegeJobs.TryAcquire(bot, _rvrDestination.Id, 64, keep.Realm != bot.Realm, true,
-                out var kind, out var slot, _rvrDestination.RegionId))
+            bool attackingKeep = keep.Realm != bot.Realm;
+            if (!AutonomousSiegeJobs.TryAcquire(bot, _rvrDestination.Id, 64, attackingKeep, !attackingKeep,
+                out var kind, out var slot, _rvrDestination.RegionId, CarriedSiegeKind(bot)))
             { _siegeNextAttempt = now + 10_000; return false; }
             _siegeJobKeep = _siegePreSupplyKeep = _rvrDestination.Id;
             _siegeKind = kind; _siegeSlot = slot;
@@ -49,7 +54,7 @@ namespace DOL.GS
             string kit = BotSiegeRuntime.Kit(bot.Realm, kind);
             // Already equipped operators proceed immediately. Repairs are topped
             // up opportunistically, never a prerequisite for marching to battle.
-            return BotSiegeRuntime.Item(bot, kit) == null && SupplySiegeItem(bot, kit, 1);
+            return BotSiegeRuntime.Item(bot, kit) == null && SupplySiegeItem(bot, kit, kind == BotSiegeKind.Ram ? 2 : 1);
         }
 
         private static bool CanSupplySiege(GameBot bot)
@@ -83,9 +88,7 @@ namespace DOL.GS
                 _rvrDestination.Id == $"rvr-keep-{k.KeepID}" && AutonomousRvrKeepPolicy.IsSiegeObjective(k));
             if (keep == null || bot.GetDistanceTo(new Point3D(keep.X, keep.Y, keep.Z)) > 6000) return false;
             bool attacking = keep.Realm != bot.Realm;
-            GameKeepDoor door = attacking ? keep.Doors.Values.Where(d=>d.IsAlive && d.IsAttackableDoor && d.State==eDoorState.Closed)
-                .OrderByDescending(d=>Vector2.DistanceSquared(new(d.X,d.Y),new(keep.X,keep.Y)))
-                .ThenBy(bot.GetDistanceTo).FirstOrDefault() : null;
+            GameKeepDoor door = attacking ? SiegeDoor(bot, keep) : null;
             if (_siegeJobKeep != _rvrDestination.Id)
             {
                 ReleaseSiegeJob(bot);
@@ -99,7 +102,8 @@ namespace DOL.GS
             bool enemyEngines = engines.Any(w => BotSiegeRuntime.LegalEnemy(bot, w));
             int present = nearby.OfType<GameBot>().Count(b => b.IsAlive && b.Realm == bot.Realm) +
                 bot.GetPlayersInRadius(6000).Count(p => p.IsAlive && p.Realm == bot.Realm);
-            if (!AutonomousSiegeJobs.TryAcquire(bot, _siegeJobKeep, present, attacking && door!=null, enemyEngines, out _siegeKind, out _siegeSlot))
+            if (!AutonomousSiegeJobs.TryAcquire(bot, _siegeJobKeep, present, attacking && door!=null, enemyEngines, out _siegeKind, out _siegeSlot,
+                    carried: CarriedSiegeKind(bot) ?? AbandonedSiegeKind(bot, engines)))
             { _siegeNextAttempt = now + 10_000; return false; }
             if (now>=_siegeNextTopup)
             {
@@ -110,14 +114,7 @@ namespace DOL.GS
                 if (bought>0) SiegeLog(bot,"repair_restock",null,$"count={bought} target={BotSiegeRuntime.RepairRestockTarget}");
             }
 
-            GameLiving target = _siegeKind == BotSiegeKind.Ram ? door : _siegeKind == BotSiegeKind.Ballista ?
-                engines.Where(w => BotSiegeRuntime.LegalEnemy(bot, w)).OrderBy(w => w is GameSiegeRam ? 0 : 1).ThenBy(bot.GetDistanceTo).FirstOrDefault() :
-                nearby.OfType<GameLiving>().Concat(bot.GetPlayersInRadius(5000)).Where(t =>
-                    (BotPvpCrowdControl.PlayerLike(t) || t is GameKeepGuard guard && guard.Component?.Keep==keep && !guard.IsPortalKeepGuard && (door==null || guard is not GuardLord)) &&
-                    BotSiegeRuntime.LegalEnemy(bot, t) && !BotPvpCrowdControl.Protected(bot, t) && BotSiegeRuntime.Visible(bot, t))
-                    .OrderBy(bot.GetDistanceTo).Take(24)
-                    .OrderByDescending(t => nearby.Count(n => n.Realm == t.Realm && n.IsAlive && n.IsWithinRadius(t, 150)))
-                    .FirstOrDefault();
+            GameLiving target = SelectSiegeTarget(bot, keep, door, _siegeKind, nearby, engines);
             // Keep firing at an already valid target; changing cluster scores
             // must not continually restart aiming or move an effective engine.
             var currentWeapon = AutonomousSiegeOwnership.All(bot).FirstOrDefault();
@@ -136,8 +133,8 @@ namespace DOL.GS
             _siegeNoTargetSince=0;
 
             // Prioritize immediate personal defense without chasing distant enemies away from an engine.
-            if (bot.GetNPCsInRadius(450).Any(n => n.IsAlive && n.TargetObject == bot && n.IsAttacking) ||
-                bot.GetPlayersInRadius(450).Any(p => p.IsAttacking && p.TargetObject == bot)) return false;
+            if (bot.GetNPCsInRadius(450).Any(n => n.IsAlive && n.TargetObject == bot && n.IsAttacking && SiegeOperatorThreat(bot, n)) ||
+                bot.GetPlayersInRadius(450).Any(p => p.IsAttacking && p.TargetObject == bot && SiegeOperatorThreat(bot, p))) return false;
 
             GameSiegeWeapon owned = AutonomousSiegeOwnership.All(bot).FirstOrDefault();
             if (owned != null && (owned.CurrentRegion != bot.CurrentRegion || BotSiegeRuntime.Kind(owned) != _siegeKind)) { owned.ReleaseControl(); owned = null; }
@@ -162,7 +159,7 @@ namespace DOL.GS
                 if (owned.TargetObject is GameLiving current && BotSiegeRuntime.LegalEnemy(bot,current) && InSiegeRange(owned,current)) target=current;
                 else if (owned.EnableToMove && now >= _siegeNextMove && !owned.InCombat && !bot.InCombat)
                 {
-                    Vector3? move = ChooseSiegePosition(bot,target,_siegeKind,engines.Where(w=>w!=owned).ToArray());
+                    Vector3? move = ChooseSiegePosition(bot,target,_siegeKind,engines.Where(w=>w!=owned).ToArray(),keep,out _);
                     var nav=PathfindingProvider.Instance;
                     if (move.HasValue && AutonomousZoneItinerary.HasCompleteCorridor(nav,owned.CurrentZone,new(owned.X,owned.Y,owned.Z),move.Value))
                     {
@@ -193,7 +190,9 @@ namespace DOL.GS
             }
 
             string kitId = BotSiegeRuntime.Kit(bot.Realm, _siegeKind);
-            if (owned == null && BotSiegeRuntime.Item(bot, kitId) == null) return SupplySiegeItem(bot, kitId, 1);
+            // Goal 1 (owner 2026-10-07): siege crews use a kit they carry, otherwise synthetic siege equipment set up on
+            // the spot; no more shopping trips (runs to run 18: hundreds of supply timeouts, not one engine deployed).
+            bool synthetic = BotSiegeRuntime.Item(bot, kitId) == null;
             if (owned == null)
             {
                 // Working player engines count too. Broken engines retain their native decay,
@@ -207,11 +206,11 @@ namespace DOL.GS
                     if (now < _siegeNextPosition) return false;
                     _siegeNextPosition = now + 15_000;
                     _siegePositionTarget = target;
-                    _siegePosition = ChooseSiegePosition(bot, target, _siegeKind, engines);
+                    _siegePosition = ChooseSiegePosition(bot, target, _siegeKind, engines, keep, out string blocked);
                     if (_siegePosition == null)
-                    { SiegeLog(bot, "placement_blocked", null, "no connected firing position"); _siegeNextAttempt = now + 15_000; return false; }
+                    { SiegeLog(bot, "placement_blocked", null, $"kind={_siegeKind} target={target.Name} {blocked}"); _siegeNextAttempt = now + 15_000; return false; }
                 }
-                if (Vector3.Distance(new(bot.X, bot.Y, bot.Z), _siegePosition.Value) > 30)
+                if (Vector3.Distance(new(bot.X, bot.Y, bot.Z), _siegePosition.Value) > (_siegeKind == BotSiegeKind.Ballista ? 55 : 90))
                 { IssuePath(bot, _siegePosition.Value, preciseArrival:true); SiegeStatus(bot, "Moving to verified siege position", target); return true; }
                 bot.StopMovingOnPath(); bot.StopMoving();
                 lock (AutonomousSiegeOwnership.ChangeGate)
@@ -220,18 +219,25 @@ namespace DOL.GS
                     if (target.GetNPCsInRadius(_siegeKind == BotSiegeKind.Ram ? (ushort)650 : (ushort)6000)
                         .OfType<GameSiegeWeapon>().Count(w => w.IsAlive && w.Realm == bot.Realm && w.Health > w.DecayedHp &&
                             (BotSiegeRuntime.Kind(w) == _siegeKind || _siegeKind is BotSiegeKind.Catapult or BotSiegeKind.Trebuchet && w is GameSiegeCatapult)) >= 2) return false;
-                    DbInventoryItem kit = BotSiegeRuntime.Item(bot, kitId);
+                    DbInventoryItem kit = synthetic ? null : BotSiegeRuntime.Item(bot, kitId);
                     SpellLine line = SkillBase.GetSpellLine(GlobalSpellsLines.Item_Effects);
                     Spell spell = kit == null || line == null ? null : SkillBase.FindSpell(kit.SpellID, line);
-                    if (spell == null || !ValidSiegeSpell(_siegeKind, spell.SpellType)) { _siegeNextAttempt = now + 30_000; return false; }
+                    if (!synthetic && (spell == null || !ValidSiegeSpell(_siegeKind, spell.SpellType))) { _siegeNextAttempt = now + 30_000; return false; }
                     owned = CreateSiegeWeapon(_siegeKind);
-                    owned.CurrentRegion = bot.CurrentRegion; owned.X = bot.X; owned.Y = bot.Y; owned.Z = bot.Z;
-                    owned.Heading = bot.Heading; owned.Realm = bot.Realm; owned.ItemId = kit.Id_nb;
-                    if (!InSiegeRange(owned, target) || !owned.AddToWorld()) return false;
-                    if (!owned.TryTakeControl(bot) || !BotSiegeRuntime.Consume(bot, kitId, 1)) { owned.Delete(); return false; }
+                    // On the verified spot itself (the operator stops up to 90 short of it).
+                    owned.CurrentRegion = bot.CurrentRegion;
+                    owned.X = (int)_siegePosition.Value.X; owned.Y = (int)_siegePosition.Value.Y; owned.Z = (int)_siegePosition.Value.Z;
+                    owned.Realm = bot.Realm; owned.ItemId = kit?.Id_nb;
+                    // A new engine reports position (0,0) until it is in the world: add it, then check its range.
+                    if (!owned.AddToWorld()) { SiegeLog(bot, "spawn_failed", null, "could not be added to the world"); return false; }
+                    owned.Heading = owned.GetHeading(target);
+                    if (!InSiegeRange(owned, target))
+                    { SiegeLog(bot, "spawn_failed", null, $"out of range ({(int)owned.GetDistanceTo(target)})"); owned.Delete(); _siegePosition = null; return false; }
+                    if (!owned.TryTakeControl(bot) || !synthetic && !BotSiegeRuntime.Consume(bot, kitId, 1))
+                    { owned.Delete(); SiegeLog(bot, "spawn_failed", null, "operator could not take control"); return false; }
                 }
                 _siegeWeapon = owned; _siegeLastProgress = now; _siegeObservedHits = 0;
-                SiegeLog(bot, "deployed", owned, $"kit={kitId}");
+                SiegeLog(bot, "deployed", owned, synthetic ? "synthetic=true" : $"kit={kitId}");
             }
             if (!bot.IsWithinRadius(owned, Math.Max(32, owned.SIEGE_WEAPON_CONTROLE_DISTANCE - 20)))
             { IssuePath(bot, new(owned.X, owned.Y, owned.Z), preciseArrival:true); return true; }
@@ -240,6 +246,7 @@ namespace DOL.GS
             { owned.TargetObject = target; owned.CurrentState &= ~GameSiegeWeapon.eState.Aimed; }
             if (!owned.SiegeWeaponTimer.IsAlive)
             {
+                (owned as GameSiegeRam)?.UpdateRamStatus(); // crew at the ram shortens the reload
                 if ((owned.CurrentState & GameSiegeWeapon.eState.Armed) == 0) owned.Arm();
                 else if ((owned.CurrentState & GameSiegeWeapon.eState.Aimed) == 0) owned.Aim();
                 else owned.Fire();
@@ -256,12 +263,27 @@ namespace DOL.GS
             return true;
         }
 
+        private static BotSiegeKind? CarriedSiegeKind(GameBot bot)
+        {
+            foreach (BotSiegeKind kind in new[] { BotSiegeKind.Ram, BotSiegeKind.Trebuchet, BotSiegeKind.Catapult, BotSiegeKind.Ballista })
+                if (BotSiegeRuntime.Item(bot, BotSiegeRuntime.Kit(bot.Realm, kind)) != null) return kind;
+            return null;
+        }
+
+        /// <summary>An attacker standing beside the operator at its own height (melee reach), not a wall archer.</summary>
+        public static bool IsSiegeOperatorThreat(float horizontalDistance, float heightDifference) =>
+            horizontalDistance <= 300 && Math.Abs(heightDifference) <= 160;
+
+        private static bool SiegeOperatorThreat(GameBot bot, GameLiving attacker) =>
+            IsSiegeOperatorThreat(Vector2.Distance(new(bot.X, bot.Y), new(attacker.X, attacker.Y)), attacker.Z - bot.Z);
+
         private static bool ValidSiegeSpell(BotSiegeKind kind, eSpellType type) => (kind, type) is
             (BotSiegeKind.Ram, eSpellType.SummonSiegeRam) or (BotSiegeKind.Catapult, eSpellType.SummonSiegeCatapult) or
             (BotSiegeKind.Trebuchet, eSpellType.SummonSiegeTrebuchet) or (BotSiegeKind.Ballista, eSpellType.SummonSiegeBallista);
         public static GameSiegeWeapon CreateSiegeWeapon(BotSiegeKind kind) => kind switch
         {
-            BotSiegeKind.Ram => new GameSiegeRam { Level = 1, Model = 2600, Name = "light siege ram" },
+            // Heavy ram (reach 500, 200 base, 12 places): bot crews standing at it count as riders (GameSiegeRam.Crew).
+            BotSiegeKind.Ram => new GameSiegeRam { Level = 3, Model = 2602, Name = "heavy siege ram" },
             BotSiegeKind.Catapult => new GameSiegeCatapult { Level = 3 },
             BotSiegeKind.Trebuchet => new GameSiegeTrebuchet { Level = 3 },
             _ => new GameSiegeBallista { Level = 3 }
@@ -270,35 +292,107 @@ namespace DOL.GS
             (w is GameSiegeRam ? w.GetDistanceTo(t) >= 200 && w.GetDistanceTo(t) <= w.attackComponent.AttackRange - 25 :
                 w.GetDistanceTo(t) >= w.MinAttackRange + 50 && w.GetDistanceTo(t) <= w.MaxAttackRange - 100);
 
-        private Vector3? ChooseSiegePosition(GameBot bot, GameLiving target, BotSiegeKind kind, GameSiegeWeapon[] engines)
+        /// <summary>
+        /// A spot for this engine, following player siege practice (SiegePlacement): rams straight out from the door's
+        /// outer face inside their reach; catapults and trebuchets on a firing ring around their ground target (no line
+        /// of sight, the shot arcs), attackers on the far side from the keep and defenders inside; ballistas need a
+        /// clear shot unless the target stands up on a wall. Every spot must be reachable without passing a closed
+        /// enemy door. Run 18 and earlier: a navmesh line-of-sight ray to the door's centre (inside the excluded door
+        /// polygon) and to wall tops failed every time, so no bot ever deployed an engine.
+        /// </summary>
+        internal static Vector3? ChooseSiegePosition(GameBot bot, GameLiving target, BotSiegeKind kind, GameSiegeWeapon[] engines,
+            AbstractGameKeep keep, out string reason)
         {
-            // Attackers cannot place a ram/artillery piece by taking a path
-            // through the very closed enemy gate they are supposed to breach.
+            reason = "no navmesh";
             var nav = AutonomousKeepApproachNavigation.ForRealm(PathfindingProvider.Instance,bot.CurrentRegion,bot.Realm);
             if (!nav.IsAvailable || !nav.HasNavmesh(bot.CurrentZone)) return null;
-            float angle = MathF.Atan2(bot.Y - target.Y, bot.X - target.X);
-            float radius = kind == BotSiegeKind.Ram ? 310 : kind == BotSiegeKind.Trebuchet ? 2600 : 1700;
-            for (int i = 0; i < 13; i++)
+            Vector2 centre = new(keep.X, keep.Y);
+            Vector3 at = new(target.X, target.Y, target.Z);
+            var (min, max) = SiegePlacement.Range(kind);
+            var candidates = kind == BotSiegeKind.Ram
+                ? SiegePlacement.RamCandidates(at, target.Heading, centre, InnerDoorApproach(keep, target))
+                : SiegePlacement.ArtilleryCandidates(at, centre, new(bot.X, bot.Y), min, max, keep.Realm != bot.Realm);
+            int tried = 0, floorless = 0, band = 0, crowded = 0, blind = 0, uneven = 0, unconnected = 0;
+            foreach (Vector3 raw in candidates.Take(kind == BotSiegeKind.Ram ? 35 : 80))
             {
-                float offset = i==0 ? 0 : ((i-1) / 2 + 1) * 0.22f * (i % 2 == 0 ? -1 : 1);
-                // The gate may stand uphill from the operator. Project near
-                // the gate's elevation, then require a full connected route;
-                // projecting exclusively at the bot's Z rejects valid ramps.
-                Vector3 raw = new(target.X + MathF.Cos(angle + offset) * radius, target.Y + MathF.Sin(angle + offset) * radius, target.Z);
+                tried++;
                 Vector3? floor = nav.GetClosestPoint(bot.CurrentZone, raw, 48, 48, kind==BotSiegeKind.Ram ? 256 : 1024, nav.DefaultFilters);
-                if (!floor.HasValue || engines.Any(w => Vector3.Distance(floor.Value, new(w.X, w.Y, w.Z)) < (kind == BotSiegeKind.Ram ? 210 : 510)) ||
-                    !AutonomousZoneItinerary.HasCompleteCorridor(nav, bot.CurrentZone, new(bot.X, bot.Y, bot.Z), floor.Value) ||
-                    !nav.HasLineOfSight(bot.CurrentZone, floor.Value + new Vector3(0,0,48), new(target.X,target.Y,target.Z+48), nav.DefaultFilters)) continue;
-                bool clear = true;
-                foreach (var d in new[] { new Vector3(40,0,0),new Vector3(-40,0,0),new Vector3(0,40,0),new Vector3(0,-40,0) })
-                {
-                    Vector3? edge = nav.GetClosestPoint(bot.CurrentZone, floor.Value + d, 16,16,48,nav.DefaultFilters);
-                    if (!edge.HasValue || Math.Abs(edge.Value.Z-floor.Value.Z)>24 || !AutonomousZoneItinerary.HasCompleteCorridor(nav,bot.CurrentZone,floor.Value,edge.Value)) { clear=false; break; }
-                }
-                if (clear) return floor;
+                if (!floor.HasValue) { floorless++; continue; }
+                float distance = Vector3.Distance(floor.Value, at);
+                if (kind == BotSiegeKind.Ram ? distance < min || distance > max : distance < min + 50 || distance > max - 100) { band++; continue; }
+                if (engines.Any(w => Vector3.Distance(floor.Value, new(w.X, w.Y, w.Z)) < (kind == BotSiegeKind.Ram ? 120 : 400))) { crowded++; continue; }
+                if (kind == BotSiegeKind.Ballista && target.Z - floor.Value.Z <= 150 &&
+                    !nav.HasLineOfSight(bot.CurrentZone, floor.Value + new Vector3(0,0,48), at + new Vector3(0,0,48), nav.DefaultFilters)) { blind++; continue; }
+                if (kind != BotSiegeKind.Ram && !LevelGround(nav, bot.CurrentZone, floor.Value)) { uneven++; continue; }
+                if (!AutonomousZoneItinerary.HasCompleteCorridor(nav, bot.CurrentZone, new(bot.X, bot.Y, bot.Z), floor.Value)) { unconnected++; continue; }
+                reason = null;
+                return floor;
             }
+            reason = $"tried={tried} floorless={floorless} out_of_reach={band} crowded={crowded} blind={blind} uneven={uneven} unconnected={unconnected}";
             return null;
         }
+
+        // Artillery needs a small level pad (rams sit on the gate approach, often a ramp or bridge).
+        private static bool LevelGround(IPathfindingMgr nav, Zone zone, Vector3 floor)
+        {
+            foreach (var d in new[] { new Vector3(40,0,0),new Vector3(-40,0,0),new Vector3(0,40,0),new Vector3(0,-40,0) })
+            {
+                Vector3? edge = nav.GetClosestPoint(zone, floor + d, 16,16,48,nav.DefaultFilters);
+                if (!edge.HasValue || Math.Abs(edge.Value.Z-floor.Z)>56) return false;
+            }
+            return true;
+        }
+
+        /// <summary>The door a ram works on: main gates before posterns, the outer gate before the inner keep door.
+        /// Owner 2026-10-07: at Caer Sursbrooke a raid ram set up on the postern instead of the keep door. The postern is
+        /// a pair of door halves, only one flagged IsPostern; the unflagged half sat farther from the keep's centre than
+        /// the keep door. A door beside a flagged postern counts as one, and doors then go in keep order (gate, keep door)
+        /// before distance. Door data is left as it is.</summary>
+        internal static GameKeepDoor SiegeDoor(GameBot bot, AbstractGameKeep keep) =>
+            keep.Doors.Values.Where(d=>d.IsAlive && d.IsAttackableDoor && d.State==eDoorState.Closed)
+                .OrderBy(d=>PosternLike(keep, d) ? 1 : 0)
+                .ThenBy(d=>d.DoorIndex)
+                .ThenByDescending(d=>Vector2.DistanceSquared(new(d.X,d.Y),new(keep.X,keep.Y)))
+                .ThenBy(bot.GetDistanceTo).FirstOrDefault();
+
+        /// <summary>For a door behind the outer gate (the keep door), the gate's position: attackers reach it from that
+        /// side. Null for the gate itself and for anything that is not a keep door.</summary>
+        internal static Vector2? InnerDoorApproach(AbstractGameKeep keep, GameObject door) =>
+            door is GameKeepDoor inner && inner.DoorIndex != 1 &&
+            keep.Doors.Values.FirstOrDefault(d => d.DoorIndex == 1) is { } gate ? new Vector2(gate.X, gate.Y) : null;
+
+        /// <summary>A postern, or the other half of one (within 200 of a flagged postern door).</summary>
+        internal static bool PosternLike(AbstractGameKeep keep, GameKeepDoor door) =>
+            door.IsPostern || keep.Doors.Values.Any(p => p != door && p.IsPostern && p.IsWithinRadius(door, 200));
+
+        /// <summary>
+        /// What each engine shoots at: rams the door; trebuchets the same door (triple damage against doors);
+        /// catapults the thickest knot of defenders (double damage against people, 150 splash), those fighting our ram
+        /// crews first, wall archers included; ballistas enemy siege first, then a target in view or up on a wall.
+        /// </summary>
+        internal static GameLiving SelectSiegeTarget(GameBot bot, AbstractGameKeep keep, GameKeepDoor door, BotSiegeKind kind,
+            GameNPC[] nearby, GameSiegeWeapon[] engines)
+        {
+            if (kind == BotSiegeKind.Ram) return door;
+            if (kind == BotSiegeKind.Trebuchet && door != null) return door;
+            var people = nearby.OfType<GameLiving>().Concat(bot.GetPlayersInRadius(5000)).Where(t =>
+                    (BotPvpCrowdControl.PlayerLike(t) || t is GameKeepGuard guard && guard.Component?.Keep==keep && !guard.IsPortalKeepGuard && (door==null || guard is not GuardLord)) &&
+                    BotSiegeRuntime.LegalEnemy(bot, t) && !BotPvpCrowdControl.Protected(bot, t))
+                .OrderBy(bot.GetDistanceTo).Take(32).ToArray();
+            if (kind == BotSiegeKind.Ballista)
+                return engines.Where(w => BotSiegeRuntime.LegalEnemy(bot, w)).OrderBy(w => w is GameSiegeRam ? 0 : 1).ThenBy(bot.GetDistanceTo).FirstOrDefault()
+                    ?? people.FirstOrDefault(t => t.Z - bot.Z > 150 || BotSiegeRuntime.Visible(bot, t));
+            var rams = engines.Where(w => w is GameSiegeRam && w.Realm == bot.Realm && w.IsAlive).ToArray();
+            return people.OrderByDescending(t => rams.Any(r => r.IsWithinRadius(t, 700)) ? 1 : 0)
+                .ThenByDescending(t => people.Count(n => n.IsWithinRadius(t, 150)))
+                .FirstOrDefault() ?? door;
+        }
+
+        /// <summary>A working friendly engine nobody is operating (a player's dropped ram included): its kind, so the bot
+        /// takes that job and hops in.</summary>
+        internal static BotSiegeKind? AbandonedSiegeKind(GameBot bot, GameSiegeWeapon[] engines) =>
+            engines.Where(w => w.Realm == bot.Realm && w.Owner == null && w.IsAlive && w.Health > w.DecayedHp && bot.IsWithinRadius(w, 1500))
+                .OrderBy(bot.GetDistanceTo).Select(w => (BotSiegeKind?)BotSiegeRuntime.Kind(w)).FirstOrDefault();
 
         private bool SupplySiegeItem(GameBot bot, string id, int quantity)
         {

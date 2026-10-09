@@ -24,8 +24,12 @@ namespace DOL.GS
         /// Pays a completed bounty. The quest must call this once while holding its
         /// own completion lock, and finish only when Granted is true.
         /// </summary>
-        public static BountyRewardResult Grant(GamePlayer player, byte assignedLevel, bool rerolled)
+        public static BountyRewardResult Grant(GamePlayer player, byte assignedLevel, bool rerolled,
+            BountyDifficulty difficulty = BountyDifficulty.Normal)
         {
+            if (assignedLevel == 50)
+                difficulty = BountyDifficulty.Normal;
+
             if (player == null || assignedLevel is < 1 or > 50)
                 return new() { Reason = "Invalid bounty reward." };
 
@@ -38,7 +42,8 @@ namespace DOL.GS
             {
                 GeneratedUniqueItem template = assignedLevel == 50
                     ? GenerateEpicItem(realm, playerClass)
-                    : GenerateLevelingItem(realm, playerClass, assignedLevel);
+                    : GenerateLevelingItem(realm, playerClass,
+                        BountyDifficultyRules.GearLevel(assignedLevel, difficulty));
 
                 if (template == null)
                     return new() { Reason = "No suitable equipment reward could be generated. Please try again." };
@@ -50,7 +55,7 @@ namespace DOL.GS
 
             long gold = assignedLevel == 50 ? Money.GetMoney(0, 0, 100, 0, 0) : 0;
             long xp = assignedLevel == 50 ? 0 : CalculateExperienceReward(
-                assignedLevel, rerolled, ServerProperties.Properties.XP_RATE);
+                assignedLevel, rerolled, ServerProperties.Properties.XP_RATE, difficulty);
 
             // Reserve actual backpack slots before paying XP or gold. AddItem can
             // still reject an item, in which case restore the inventory and leave
@@ -99,10 +104,12 @@ namespace DOL.GS
         }
 
         /// <summary>
-        /// One bulb is one tenth of the assigned level's XP width. The multiplier
-        /// is applied here exactly once; ForceGainExperience does not apply it.
+        /// One bulb is one tenth of the assigned level's XP width: 2, 4 or 8 bulbs
+        /// by difficulty, halved after a reroll. The multiplier is applied here
+        /// exactly once; ForceGainExperience does not apply it.
         /// </summary>
-        public static long CalculateExperienceReward(byte assignedLevel, bool rerolled, double xpRate)
+        public static long CalculateExperienceReward(byte assignedLevel, bool rerolled, double xpRate,
+            BountyDifficulty difficulty = BountyDifficulty.Normal)
         {
             if (assignedLevel is < 1 or >= 50 || double.IsNaN(xpRate) || xpRate <= 0)
                 return 0;
@@ -110,13 +117,12 @@ namespace DOL.GS
             long current = GamePlayer.GetExperienceAmountForLevel(assignedLevel - 1);
             long next = GamePlayer.GetExperienceAmountForLevel(assignedLevel);
             decimal rate = (decimal)Math.Min(xpRate, 1000d);
-            decimal amount = (next - current) * (rerolled ? 0.1m : 0.2m) * rate;
+            decimal amount = (next - current) * BountyDifficultyRules.Bulbs(difficulty, rerolled) * 0.1m * rate;
             return (long)Math.Min(long.MaxValue, decimal.Round(amount, 0, MidpointRounding.AwayFromZero));
         }
 
-        private static GeneratedUniqueItem GenerateLevelingItem(eRealm realm, eCharacterClass playerClass, byte currentLevel)
+        private static GeneratedUniqueItem GenerateLevelingItem(eRealm realm, eCharacterClass playerClass, byte itemLevel)
         {
-            byte itemLevel = (byte)Math.Min(51, currentLevel + 1);
             var item = AtlasROGManager.GenerateMonsterLootROG(realm, playerClass, itemLevel, false);
             item.AllowAdd = true;
             return item;

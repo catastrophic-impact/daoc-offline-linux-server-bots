@@ -27,7 +27,7 @@ namespace DOL.GS
             _capitalTransitPhase = _groupDirective?.Phase;
             if (Log.IsInfoEnabled)
                 Log.Info($"AUTONOMOUS_CAPITAL_TRANSIT bot=\"{bot.Name}\" id={bot.DatabaseID} level={bot.Level} " +
-                    $"realm={bot.Realm} entry={plan.Entry.Id} exit={plan.Exit.Id} goal=\"{bot.PersistentRecord?.CurrentGoal}\"");
+                    $"realm={GlobalConstants.RealmToName(bot.Realm)} entry={plan.Entry.Id} exit={plan.Exit.Id} goal=\"{bot.PersistentRecord?.CurrentGoal}\"");
             return true;
         }
 
@@ -53,8 +53,8 @@ namespace DOL.GS
             int distance = Distance(bot.X, bot.Y, leg.SourceX, leg.SourceY);
             if (!AtRegionCrossing(bot, leg, distance))
             {
-                Vector3 raw = new(leg.SourceX, leg.SourceY, leg.SourceZ);
-                if (!TryResolveConnectedApproach(bot, raw, ZonePointArrivalRadius, out Vector3 approach))
+                Vector3 raw = CrossingApproachPoint(leg);
+                if (!TryResolveConnectedApproach(bot, raw, CrossingApproachRadius(leg), out Vector3 approach))
                 {
                     QuarantineZonePoint(bot, leg);
                     AbandonCamp(bot, $"Capital gate {leg.Id} has no connected approach from the current surface");
@@ -83,7 +83,7 @@ namespace DOL.GS
             if (leg == plan.Entry) _capitalTransit = plan;
             else if (Log.IsInfoEnabled)
                 Log.Info($"AUTONOMOUS_CAPITAL_TRANSIT_ARRIVE bot=\"{bot.Name}\" id={bot.DatabaseID} level={bot.Level} " +
-                    $"realm={bot.Realm} exit={leg.Id} region={bot.CurrentRegionID} position={bot.X},{bot.Y},{bot.Z}");
+                    $"realm={GlobalConstants.RealmToName(bot.Realm)} exit={leg.Id} region={bot.CurrentRegionID} position={bot.X},{bot.Y},{bot.Z}");
             AutonomousStuckWatchdog.MarkProgress(bot, eAutonomousProgressKind.Movement);
             return true;
         }
@@ -135,7 +135,7 @@ namespace DOL.GS
                 $"Recovered from a disconnected capital interior through real zone connection {edge.Id}",
                 destination.MonsterName, destination.ZoneName, true);
             Log.Warn($"AUTONOMOUS_CAPITAL_EGRESS_RECOVERY bot=\"{bot.Name}\" id={bot.DatabaseID} " +
-                     $"realm={bot.Realm} edge={edge.Id} from={sourceRegion}:{sourceX},{sourceY},{sourceZ} " +
+                     $"realm={GlobalConstants.RealmToName(bot.Realm)} edge={edge.Id} from={sourceRegion}:{sourceX},{sourceY},{sourceZ} " +
                      $"to={edge.TargetRegion}:{edge.TargetX},{edge.TargetY},{edge.TargetZ} " +
                      $"goal=\"{bot.PersistentRecord?.CurrentGoal}\"");
             return true;

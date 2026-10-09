@@ -309,6 +309,9 @@ namespace DOL.GS
 
                 if (_activePath.Doors.Remove(node, out List<GameDoorBase> doors))
                 {
+                    // Owner 2026-10-07: bots kept working the border keep door levers, so the player could not use
+                    // them. Bots walk through openable doors anyway; only other NPCs open them on the way.
+                    if (Owner is GameBot) continue;
                     foreach (GameDoorBase door in doors)
                     {
                         if (door.CanBeOpenedViaInteraction && door.State is not eDoorState.Open)

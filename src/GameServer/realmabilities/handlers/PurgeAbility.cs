@@ -73,22 +73,16 @@ namespace DOL.GS.RealmAbilities
             bool removed = false;
             ArrayList effectsToRemove = new ArrayList();
 
-            GamePlayer player = (GamePlayer)living;
-
-            if (player == null)
+            // Any living may purge (gamebots buy Purge with their realm points); player-only
+            // messages are sent only to players.
+            if (living == null)
                 return false;
 
-            EffectListComponent effectListComponent = null;
+            GamePlayer player = living as GamePlayer;
+            EffectListComponent effectListComponent = living.effectListComponent;
 
-            if (player.CharacterClass is ClassDisciple)
-            {
-                if (player.ControlledBrain?.Body is NecromancerPet necroPet)
-                    effectListComponent = necroPet.effectListComponent;
-                else
-                    effectListComponent = player.effectListComponent;
-            }
-            else
-                effectListComponent = player.effectListComponent;
+            if ((living as IGamePlayer)?.CharacterClass is ClassDisciple && living.ControlledBrain?.Body is NecromancerPet necroPet)
+                effectListComponent = necroPet.effectListComponent;
 
             if (effectListComponent == null)
                 return false;
@@ -113,7 +107,7 @@ namespace DOL.GS.RealmAbilities
             }
 
             // Show spell effect
-            foreach (GamePlayer rangePlayer in player.GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
+            foreach (GamePlayer rangePlayer in living.GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
             {
                 rangePlayer.Out.SendSpellEffectAnimation(effectListComponent.Owner, effectListComponent.Owner, 7011, 0, false, (byte)(removed ? 1 : 0));
             }
@@ -121,12 +115,12 @@ namespace DOL.GS.RealmAbilities
             // Disable purge if an effect was purged
             if (removed)
             {
-                player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "PurgeAbility.RemoveNegativeEffects.FallFromYou"), eChatType.CT_Advise, eChatLoc.CL_SystemWindow);
-                player.Stealth(false);
+                player?.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "PurgeAbility.RemoveNegativeEffects.FallFromYou"), eChatType.CT_Advise, eChatLoc.CL_SystemWindow);
+                living.Stealth(false);
             }
             else if (!isFromGroupPurge)
             {
-                player.DisableSkill(purge, 5);
+                living.DisableSkill(purge, 5);
             }
 
             return removed;

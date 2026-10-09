@@ -1116,8 +1116,11 @@ namespace DOL.GS.Spells
 					{
 						if (!CheckEndCast(Target))
 						{
-							// Allow flute mez to keep trying (1.65 compliance).
-							if (m_spell.IsPulsing && m_spell.SpellType is eSpellType.Mesmerize)
+							// Allow flute mez to keep trying (1.65 compliance). A bot
+							// cannot cancel it with another song, so its retry never
+							// ended and froze the bot; bots replan instead
+							// (stefanrows/OfflineDAoC fork, 0.187.0).
+							if (m_spell.IsPulsing && m_spell.SpellType is eSpellType.Mesmerize && Caster is GamePlayer)
 								CastState = eCastState.CastingRetry;
 							else
 								CastState = eCastState.Interrupted;
@@ -1240,8 +1243,16 @@ namespace DOL.GS.Spells
 
 		public virtual int CalculateEnduranceCost()
 		{
+			// Sluaghbinder spells cost power only; their styles carry the endurance cost.
+			if (IsSluaghbinder(m_caster))
+				return 0;
+
 			return 5;
 		}
+
+		private static bool IsSluaghbinder(GameLiving caster) =>
+			caster is GamePlayer { CharacterClass.ID: (int)eCharacterClass.Sluaghbinder } ||
+			caster is GameBot { CharacterClass.ID: (int)eCharacterClass.Sluaghbinder };
 
 		/// <summary>
 		/// Called whenever the casters casting sequence is to interrupt immediately
@@ -1376,7 +1387,7 @@ namespace DOL.GS.Spells
 					{
 						if (player != toExclude)
 							// Message: {0} casts a spell!
-							player.MessageFromArea(m_caster, LanguageMgr.GetTranslation(player.Client, "SpellHandler.CastSpell.Msg.LivingCastsSpell", Caster.GetName(0, true)), eChatType.CT_Spell, eChatLoc.CL_SystemWindow);
+							player.MessageFromArea(m_caster, LanguageMgr.GetTranslation(player.Client, "SpellHandler.CastSpell.Msg.LivingCastsSpell", AutonomousNameMask.NameFor(player, Caster, 0, true)), eChatType.CT_Spell, eChatLoc.CL_SystemWindow);
 					}
 				}
 			}
@@ -2533,7 +2544,7 @@ namespace DOL.GS.Spells
 				MessageToLiving(target, "You resist the effect!", eChatType.CT_SpellResisted);
 
 			// Deliver message to the caster as well.
-			MessageToCaster($"{target.GetName(0, true)} resists the effect! ({CalculateSpellResistChance(target):0.0}%)", eChatType.CT_SpellResisted);
+			MessageToCaster($"{AutonomousNameMask.NameFor(CasterViewer(), target, 0, true)} resists the effect! ({CalculateSpellResistChance(target):0.0}%)", eChatType.CT_SpellResisted);
 		}
 
 		/// <summary>
@@ -2583,6 +2594,10 @@ namespace DOL.GS.Spells
 		}
 
 		#region messages
+
+		/// <summary>The player who reads this caster's messages: the caster, or the owner of a controlled pet.</summary>
+		private GamePlayer CasterViewer() =>
+			Caster as GamePlayer ?? ((Caster as GameNPC)?.Brain as IControlledBrain)?.GetPlayerOwner();
 
 		/// <summary>
 		/// Sends a message to the caster, if the caster is a controlled
@@ -3257,9 +3272,9 @@ namespace DOL.GS.Spells
 				modMessage = $" ({ad.Modifier})";
 
 			if (Caster is GamePlayer or NecromancerPet)
-				MessageToCaster(string.Format("You hit {0} for {1}{2} damage!", ad.Target.GetName(0, false), ad.Damage, modMessage), eChatType.CT_YouHit);
+				MessageToCaster(string.Format("You hit {0} for {1}{2} damage!", AutonomousNameMask.NameFor(CasterViewer(), ad.Target, 0, false), ad.Damage, modMessage), eChatType.CT_YouHit);
 			else if (Caster is GameNPC)
-				MessageToCaster(string.Format("Your {0} hits {1} for {2}{3} damage!", Caster.Name, ad.Target.GetName(0, false), ad.Damage, modMessage), eChatType.CT_YouHit);
+				MessageToCaster(string.Format("Your {0} hits {1} for {2}{3} damage!", Caster.Name, AutonomousNameMask.NameFor(CasterViewer(), ad.Target, 0, false), ad.Damage, modMessage), eChatType.CT_YouHit);
 
 			if (ad.CriticalDamage > 0)
 				MessageToCaster($"You critically hit for an additional {ad.CriticalDamage} damage! ({ad.CriticalChance}%)", eChatType.CT_YouHit);

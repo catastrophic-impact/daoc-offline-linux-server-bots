@@ -67,10 +67,10 @@ namespace DOL.GS
                 case eCharacterClass.Savage: return new SavageBotSpec(spec);
                 case eCharacterClass.Shadowblade: return new ShadowbladeBotSpec(spec);
                 case eCharacterClass.Shaman: return new ShamanBotSpec(spec);
-                case eCharacterClass.Skald: return new SkaldBotSpec();
+                case eCharacterClass.Skald: return new SkaldBotSpec(spec);
                 case eCharacterClass.Spiritmaster: return new SpiritmasterBotSpec(spec);
                 case eCharacterClass.Thane: return new ThaneBotSpec(spec);
-                case eCharacterClass.Warrior: return new WarriorBotSpec();
+                case eCharacterClass.Warrior: return new WarriorBotSpec(spec);
             }
 
             return null;
@@ -106,6 +106,8 @@ namespace DOL.GS
             eCharacterClass.Shaman => [eSpecType.MendShaman, eSpecType.AugShaman, eSpecType.SubtShaman],
             eCharacterClass.Spiritmaster => [eSpecType.DarkSpirit, eSpecType.SuppSpirit, eSpecType.SummSpirit],
             eCharacterClass.Thane => [eSpecType.OneHandAndShield, eSpecType.TwoHanded],
+            eCharacterClass.Skald => [eSpecType.OneHandAndShield, eSpecType.TwoHanded],
+            eCharacterClass.Warrior => [eSpecType.OneHandAndShield, eSpecType.TwoHanded],
             _ => [eSpecType.None],
         };
 

@@ -10,7 +10,7 @@ public static class AutonomousRvrTravel
 {
     public static bool TraverseFriendlyDoor(GameBot bot, Vector3 destination)
     {
-        if (!AutonomousObjectiveAssignments.Is(bot, eAutonomousObjectiveKind.RvR) ||
+        if (!RealmWarObjective(bot) ||
             bot.TempProperties.GetProperty<long>("RvrDoorPassUntil") > GameLoop.GameLoopTime) return false;
         foreach (GameKeepDoor door in GameServer.KeepManager.GetKeepsOfRegion(bot.CurrentRegionID)
                      .Where(keep => keep.Realm == bot.Realm).SelectMany(keep => keep.Doors.Values))
@@ -28,31 +28,10 @@ public static class AutonomousRvrTravel
         }
         return false;
     }
-    private static readonly int[] BorderDoors =
-        [11020501, 11020502, 12000101, 12000102, 102093501, 102093502,
-         111161301, 111161302, 206016801, 206016802, 207156901, 207156902];
-
-    public static bool OpenNearbyBorderDoors(GameBot bot, Vector3 destination)
-    {
-        if (bot?.IsAutonomousWorldBot != true ||
-            !AutonomousObjectiveAssignments.Is(bot, eAutonomousObjectiveKind.RvR)) return false;
-        bool opened = false;
-        foreach (int id in BorderDoors)
-        {
-            GameDoorBase door = DoorMgr.GetDoorByID(id);
-            if (door == null || door.CurrentRegion != bot.CurrentRegion || door.Locked ||
-                door.State != eDoorState.Closed || door.Realm != bot.Realm && door.Realm != eRealm.Door ||
-                !bot.IsWithinRadius(door, ServerProperties.Properties.WORLD_PICKUP_DISTANCE * 3)) continue;
-            Vector2 heading = new(destination.X - bot.X, destination.Y - bot.Y);
-            Vector2 toDoor = new(door.X - bot.X, door.Y - bot.Y);
-            if (Vector2.Dot(heading, toDoor) < 0 || Math.Abs(door.Z - bot.Z) > 400) continue;
-            // This is the same authoritative operation sent by the player's
-            // lever/door request. The native five-second closure remains intact.
-            door.Open(bot);
-            opened |= door.State == eDoorState.Open;
-        }
-        return opened;
-    }
+    // Frontier RvR and battleground bots both pass their realm's doors (battleground bots were left behind theirs).
+    private static bool RealmWarObjective(GameBot bot) =>
+        AutonomousObjectiveAssignments.Is(bot, eAutonomousObjectiveKind.RvR) ||
+        AutonomousObjectiveAssignments.Is(bot, eAutonomousObjectiveKind.Battleground);
 
     public static Vector3 ChooseWaypoint(GameBot bot, Vector3 destination)
     {

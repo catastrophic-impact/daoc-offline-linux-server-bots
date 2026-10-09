@@ -312,7 +312,7 @@ namespace DOL.GS
 		public PitMonster() : base() { }
 		public override void TakeDamage(GameObject source, eDamageType damageType, int damageAmount, int criticalAmount)
 		{
-			if (source is GamePlayer || source is GameSummonedPet)
+			if (NamedMobDamage.CountsAsAttacker(source))
 			{
 				if (damageType == eDamageType.Body || damageType == eDamageType.Cold ||
 					damageType == eDamageType.Energy || damageType == eDamageType.Heat
@@ -324,7 +324,7 @@ namespace DOL.GS
 					if (source is GamePlayer)
 						truc = (source as GamePlayer);
 					else
-						truc = ((source as GameSummonedPet).Owner as GamePlayer);
+						truc = (source as GameSummonedPet)?.Owner as GamePlayer;
 					if (truc != null)
 						truc.Out.SendMessage(Name + " is immune to any damage!", eChatType.CT_System,
 							eChatLoc.CL_ChatWindow);

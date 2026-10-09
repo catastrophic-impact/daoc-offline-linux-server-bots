@@ -1102,7 +1102,7 @@ namespace DOL.GS.ServerRules
             if (killedNpc.CampBonus > 0)
                 killedNpc.CampBonus -= 0.02;
 
-            if (killedNpc.CanDropLoot)
+            if (killedNpc.CanDropLoot && !NoItemLoot(killedNpc))
             {
                 // The set contains potential item owners (entities able to pick the item up). They are the battlegroup, group, and player that did the most damage.
                 // The set is ordered from the highest damaging entity to the lowest. If two entities did the same amount of damage, the first that's added to the set is prioritized.
@@ -1652,6 +1652,15 @@ namespace DOL.GS.ServerRules
             }
         }
 
+        /// <summary>
+        /// Owner 2026-10-07: realm defenders and player stand-ins drop no items. Keep guards, archers and lords
+        /// (GameKeepGuard, GuardLord included), gamebots and pets of players or gamebots (in DAoC killing an enemy
+        /// player or a pet gave realm points, never items). A /raid 80 siege filled the player's bags with ROG drops.
+        /// </summary>
+        public static bool NoItemLoot(GameNPC killedNpc) =>
+            killedNpc is Keeps.GameKeepGuard or GameBot ||
+            killedNpc.Brain is IControlledBrain && AutonomousBotRealmPointRewards.ResolveRootRewardOwner(killedNpc) is GamePlayer or GameBot;
+
         public virtual void DropLoot(GameNPC killedNpc, GameObject killer, SortedSet<ItemOwnerTotalDamagePair> itemOwners)
         {
             List<GamePlayer> playersInRadius = killedNpc.GetPlayersInRadius(WorldMgr.INFO_DISTANCE);
@@ -1904,6 +1913,7 @@ namespace DOL.GS.ServerRules
 
             killedPlayer.Statistics.AddToDeaths();
             killedPlayer.LastDeathRealmPoints = 0; // Reset first in case this is a PvE death for example.
+            AutonomousBotRealmPointRewards.PayGamebotsForPlayerKill(killedPlayer);
 
             ProcessXpGainers(killedPlayer,
                 out double totalDamage,

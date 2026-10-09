@@ -14,7 +14,11 @@ public static class AutonomousRvrDashboard
     public sealed record Objective(string Kind, string Name, string Owner, string State, string Location,
         string Carrier, string Forces, string Id = "", long CooldownMilliseconds = 0, long PhaseRemainingMilliseconds = 0, string Phase = "");
     public sealed record Participant(string EventId, string GroupId, string Name, string Realm, string Location, string Activity, int X, int Y, int Z);
-    public sealed record Snapshot(DateTime UpdatedUtc, bool Running, Objective[] Objectives, Participant[] Participants = null);
+    public sealed record Battleground(string Name, int MinLevel, int MaxLevel, string CentralKeep, string Owner,
+        int AlbionInside, int MidgardInside, int HiberniaInside, int AlbionTravelling, int MidgardTravelling,
+        int HiberniaTravelling, int Monsters);
+    public sealed record Snapshot(DateTime UpdatedUtc, bool Running, Objective[] Objectives, Participant[] Participants = null,
+        Battleground[] Battlegrounds = null);
     private static Timer _timer;
     private static int _writing;
     private static readonly object HandlerSync = new();
@@ -64,6 +68,31 @@ public static class AutonomousRvrDashboard
         }
     }
 
+    /// <summary>The launcher's Battlegrounds tab: bracket, central keep owner, bots inside and on their way.</summary>
+    private static Battleground[] BattlegroundStatus()
+    {
+        GameBot[] bots = AutonomousBotRegistry.Snapshot();
+        var result = new Battleground[BattlegroundBrackets.Count];
+        for (int index = 0; index < result.Length; index++)
+        {
+            BattlegroundBrackets.Bracket bracket = BattlegroundBrackets.Get(index);
+            AbstractGameKeep central = GameServer.KeepManager.GetKeepsOfRegion(bracket.RegionId)
+                .FirstOrDefault(keep => !keep.IsPortalKeep);
+            int Inside(eRealm realm) => bots.Count(bot => bot.IsAlive && bot.Realm == realm && bot.CurrentRegionID == bracket.RegionId);
+            int Travelling(eRealm realm) => bots.Count(bot => bot.Realm == realm && bot.CurrentRegionID != bracket.RegionId &&
+                AutonomousObjectiveAssignments.Is(bot, eAutonomousObjectiveKind.Battleground) && BattlegroundBrackets.Allows(bracket, bot.Level));
+            Region region = WorldMgr.GetRegion(bracket.RegionId);
+            int monsters = region == null ? 0 : region.Objects.OfType<GameNPC>().Count(npc =>
+                npc.IsAlive && npc.ObjectState == GameObject.eObjectState.Active && npc.Realm == eRealm.None &&
+                npc is not GameBot && npc is not GameKeepGuard && (npc.Flags & GameNPC.eFlags.PEACE) == 0);
+            result[index] = new(bracket.Name, bracket.MinLevel, bracket.MaxLevel, central?.Name ?? string.Empty,
+                central == null ? string.Empty : central.Realm == eRealm.None ? "Neutral" : GlobalConstants.RealmToName(central.Realm),
+                Inside(eRealm.Albion), Inside(eRealm.Midgard), Inside(eRealm.Hibernia),
+                Travelling(eRealm.Albion), Travelling(eRealm.Midgard), Travelling(eRealm.Hibernia), monsters);
+        }
+        return result;
+    }
+
     private static void Publish(object state)
     {
         if (Interlocked.Exchange(ref _writing, 1) != 0) return;
@@ -98,7 +127,7 @@ public static class AutonomousRvrDashboard
                     AutonomousRvrEventLayer.RelicCarrierTargetId(relic));
             });
             var forceTargets = AutonomousRvrEventLayer.ForceTargets();
-            var raids = AutonomousRealmRaid.Snapshot().Select(r => new Objective(r.Id.StartsWith("epic-") ? "Epic dungeon" : "Dragon", r.Name, r.Realm, r.State,
+            var raids = AutonomousRealmRaid.Snapshot().Select(r => new Objective(r.Id.StartsWith("epic-") ? "Epic dungeon" : r.Id.StartsWith("summoners-") || r.Id.StartsWith("darkness-") ? "Neutral raid" : "Dragon", r.Name, r.Realm, r.State,
                 r.Name, "", $"Assigned: {r.Assigned}/{RealmRaidRecruitmentPolicy.MaximumBots} · Present: {r.Present} · Start requires: {r.Suggested}" +
                     (r.Phase == "Waiting" ? " · Holding for arrivals / dragon landing (not attacking)" : ""),
                 r.Id, r.State is "Respawning" or "Event cooldown" ? r.Remaining : 0,
@@ -113,7 +142,8 @@ public static class AutonomousRvrDashboard
                     ? new Participant(target, force, bot.Name, GlobalConstants.RealmToName(bot.Realm), bot.CurrentZone?.Description ?? "Unknown",
                         bot.PersistentRecord?.Activity ?? "", bot.X, bot.Y, bot.Z) : null;
             }).Where(p => p != null).ToArray();
-            string json = JsonSerializer.Serialize(new Snapshot(DateTime.UtcNow, true, keeps.Concat(relics).Concat(raids).ToArray(), participants));
+            string json = JsonSerializer.Serialize(new Snapshot(DateTime.UtcNow, true, keeps.Concat(relics).Concat(raids).ToArray(), participants,
+                BattlegroundStatus()));
             File.WriteAllText(FilePath + ".tmp", json);
             File.Move(FilePath + ".tmp", FilePath, true);
         }
@@ -145,7 +175,10 @@ public static class AutonomousRvrDashboard
                $"{GlobalConstants.RealmToName(battle.Defender)}: {battle.PresentDefenders}/{battle.CapPerRealm} ({battle.Defenders})\n" +
                $"{GlobalConstants.RealmToName(thirdRealm)}: {battle.PresentThirdRealm}/{battle.CapPerRealm} ({battle.ThirdRealm})\n" +
                "Attackers prepare first; opposing realms respond to actual fighting\n" +
-               $"Preparation: {Math.Max(0, (int)remaining.TotalHours)}h {remaining.Minutes:00}m left";
+               (battle.MusterRemainingMilliseconds > 0
+                   ? $"Gathering: marching in {Math.Max(1, (int)Math.Ceiling(battle.MusterRemainingMilliseconds / 60_000d))}m\n"
+                   : battle.MusterRemainingMilliseconds == 0 ? "Marching to the keep\n" : "") +
+               $"Attack window: {Math.Max(0, (int)remaining.TotalHours)}h {remaining.Minutes:00}m left (present = at the keep)";
     }
 
     private static void OnKeepTaken(DOLEvent e, object sender, EventArgs args)

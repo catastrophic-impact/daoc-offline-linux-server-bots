@@ -66,7 +66,7 @@ namespace DOL.GS.Commands
             };
             lines.AddRange(pages[page - 1].Lines);
             lines.AddRange(CrossingLines(classicId, islesId, client.Player.Realm));
-            client.Out.SendCustomTextWindow($"{client.Player.Realm} stables - {pages[page - 1].Section} {page}/{pages.Count}", lines);
+            client.Out.SendCustomTextWindow($"{GlobalConstants.RealmToName(client.Player.Realm)} stables - {pages[page - 1].Section} {page}/{pages.Count}", lines);
         }
 
         public static bool TryGetRegions(eRealm realm, out ushort classicId, out ushort islesId)

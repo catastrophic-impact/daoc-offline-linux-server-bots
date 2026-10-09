@@ -24,6 +24,14 @@ namespace DOL.GS
                 HasPartyCombat(companion) || HasCombatNearOwner(owner));
         }
 
+        // The frontier raid aggro leash: a raid bot chasing an enemy gamebot far from the player (its own part of the
+        // raid still busy) is recalled anyway once nothing is fighting near the player, so roamer chases never drag the
+        // raid away. PvE fights keep the normal recall rules.
+        public static bool FrontierChaseLeash(GameBot companion) =>
+            CompanionRaid.IsMember(companion) && CompanionPvpEngagement.FrontierRaidAggro(companion.Owner) &&
+            CompanionPvpEngagement.Enemy(companion.Owner, companion.TargetObject as GameLiving) &&
+            !HasCombatNearOwner(companion.Owner);
+
         private static bool HasCombatNearOwner(GamePlayer owner) => owner?.Group != null &&
             owner.Group.GetMembersInTheGroup().Any(member => member.IsAlive &&
                 member.CurrentRegionID == owner.CurrentRegionID && owner.IsWithinRadius(member, MaximumLeaderDistance) &&

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using DOL.AI.Brain;
 using DOL.Database;
 using DOL.GS.PacketHandler;
@@ -14,6 +15,26 @@ namespace DOL.GS.Keeps
 
         private eRealm m_lastRealm = eRealm.None;
         private long m_lastSpawnTime = 0;
+
+        /// <summary>
+        /// Owner 2026-10-07 (Nottmoor Faste, then Caer Sursbrooke): bots took the keep with its keep door still standing;
+        /// casters and archers hit the lord through the walls (NPC spells and arrows skip the client line-of-sight check).
+        /// While the gate or the keep door (posterns aside) is closed, the lord takes no damage from a bot or a bot's pet.
+        /// Players are unaffected.
+        /// </summary>
+        public bool ShieldedFromBots =>
+            Component?.Keep is { } keep && keep.Doors.Values.Any(d => d.IsAlive && d.IsAttackableDoor &&
+                d.State == eDoorState.Closed && !AutonomousWorldBotController.PosternLike(keep, d));
+
+        public static bool IsBotSource(GameObject source)
+        {
+            for (int depth = 0; depth < 4 && source != null; depth++)
+            {
+                if (source is GameBot) return true;
+                source = source is GameNPC { Brain: IControlledBrain controlled } ? controlled.GetLivingOwner() : null;
+            }
+            return false;
+        }
 
         public override double GetArmorAbsorb(eArmorSlot slot)
         {
@@ -246,6 +267,12 @@ namespace DOL.GS.Keeps
         /// <param name="criticalAmount">The critical hit amount of damage</param>
         public override void TakeDamage(GameObject source, eDamageType damageType, int damageAmount, int criticalAmount)
         {
+            // Siege engines never hurt the lord (splash, bolts or a lob onto the keep roof), whoever operates them.
+            if (source is GameSiegeWeapon)
+                return;
+            if (IsBotSource(source) && ShieldedFromBots)
+                return;
+
             int distance;
             if (Component != null && Component.Keep != null && Component.Keep is GameKeep)
                 distance = 400;

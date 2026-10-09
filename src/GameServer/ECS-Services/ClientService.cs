@@ -844,7 +844,12 @@ namespace DOL.GS
                 GameNPC cachedNpc = pair.Key;
 
                 if (!inRangeSet.Contains(cachedNpc))
+                {
                     npcUpdateCache.Remove(cachedNpc);
+                    // A stealthed gamebot the player can no longer detect disappears from the client (else it lingers).
+                    if (cachedNpc is GameBot { IsStealthed: true } && cachedNpc.ObjectState is GameObject.eObjectState.Active)
+                        player.Out.SendObjectRemove(cachedNpc);
+                }
             }
 
             GameObject targetObject = player.TargetObject;

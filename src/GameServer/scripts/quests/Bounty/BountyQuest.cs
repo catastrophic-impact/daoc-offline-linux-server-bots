@@ -17,6 +17,13 @@ namespace DOL.GS.Quests
     {
         private const int TargetDisplayByteLimit = 56;
         private const string LastCompletedTargetKey = "BountyLastCompletedTargetName";
+
+        /// <summary>
+        /// Saved as the "format" property. Bounties saved by 0.33 and earlier have
+        /// no format key; they keep working as Normal hunts with the new kill
+        /// count and can be swapped once, free, for a new-style hunt.
+        /// </summary>
+        public const string CurrentFormat = "2";
         private static readonly Logging.Logger Log = Logging.LoggerManager.Create(typeof(BountyQuest));
         private readonly object _completionLock = new();
         private BountyTargetCandidate _targetCache;
@@ -34,14 +41,14 @@ namespace DOL.GS.Quests
 
         public override int MaxQuestCount => int.MaxValue;
         public override int Level => AssignedLevel == 0 ? 1 : AssignedLevel;
-        public override string Name => FormatQuestName(Target);
+        public override string Name => FormatQuestName(Target, Difficulty);
 
         public override string Story =>
             "The roads are never safe for long. Take one hunt at a time, follow the mark on your map, " +
             "and bring proof of the kill back to your realm's Bounty Master.";
 
         public override string Summary =>
-            "A random yellow-con monster at your level, or a great named foe at level 50. " +
+            "A random monster at your level (6 or 12 levels higher on hard or very hard), or a great named foe at level 50. " +
             "Complete the hunt and return for equipment and experience.";
 
         public override string Conclusion => "The road is safer for your work. Another contract waits whenever you are ready.";
@@ -54,7 +61,7 @@ namespace DOL.GS.Quests
                 if (target == null)
                     return "Speak to a Bounty Master to receive a hunt.";
                 return FormatJournalDescription(target, AssignedLevel, WasRerolled,
-                    Progress, RequiredKills, Step == 2);
+                    Progress, RequiredKills, Step == 2, Difficulty);
             }
         }
 
@@ -65,7 +72,8 @@ namespace DOL.GS.Quests
         /// objective and turn-in state first, with flavor text only when it fits.
         /// </summary>
         public static string FormatJournalDescription(BountyTargetCandidate target, byte assignedLevel,
-            bool rerolled, int progress, int requiredKills, bool ready)
+            bool rerolled, int progress, int requiredKills, bool ready,
+            BountyDifficulty difficulty = BountyDifficulty.Normal)
         {
             if (target == null)
                 return "Speak to a Bounty Master to receive a hunt.";
@@ -78,9 +86,11 @@ namespace DOL.GS.Quests
             string direction = target.IsDungeon
                 ? $"Inside {zoneName}."
                 : $"In {zoneName}.";
+            int bulbs = BountyDifficultyRules.Bulbs(difficulty, rerolled);
             string reward = assignedLevel == 50
                 ? "Reward: 100g and 1-3 exceptional class items."
-                : $"Reward: {(rerolled ? "1 bulb" : "2 bulbs")} of Lv{assignedLevel} XP at server rate, 1-3 class items.";
+                : $"Reward: {bulbs} bulb{(bulbs == 1 ? "" : "s")} of Lv{assignedLevel} XP, " +
+                  $"1-3 Lv{BountyDifficultyRules.GearLevel(assignedLevel, difficulty)} class items.";
             string essential = $"{action} {direction} {reward} Map: /bountylocation.";
             string flavored = $"{GetHuntReason(target)} {essential}";
 
@@ -96,9 +106,12 @@ namespace DOL.GS.Quests
             return $"{action} {direction}";
         }
 
-        public static string FormatQuestName(BountyTargetCandidate target) => target == null
+        public static string FormatQuestName(BountyTargetCandidate target,
+            BountyDifficulty difficulty = BountyDifficulty.Normal) => target == null
             ? "The Realm's Bounty"
-            : $"Bounty: {FitPacketText(target.Name, TargetDisplayByteLimit)}";
+            : difficulty == BountyDifficulty.Normal
+                ? $"Bounty: {FitPacketText(target.Name, TargetDisplayByteLimit)}"
+                : $"{BountyDifficultyRules.DisplayName(difficulty)} Bounty: {FitPacketText(target.Name, TargetDisplayByteLimit)}";
 
         public static string FormatGoalName(BountyTargetCandidate target) => target == null
             ? "Slay the target"
@@ -119,6 +132,14 @@ namespace DOL.GS.Quests
 
         public byte AssignedLevel => ReadByte("assigned");
         public bool WasRerolled => GetCustomProperty("rerolled") == "1";
+        public BountyDifficulty Difficulty => BountyDifficultyRules.Parse(GetCustomProperty("difficulty"));
+        public bool IsLegacyFormat => IsLegacyFormatValue(GetCustomProperty("format"));
+
+        /// <summary>A 0.33-or-older leveling bounty the player may swap once, free.</summary>
+        public bool CanUpdateLegacy => IsLegacyFormat && Step is 1 or 2 && AssignedLevel is >= 1 and < 50 &&
+                                       m_questPlayer?.Level < 50;
+
+        public static bool IsLegacyFormatValue(string savedFormat) => savedFormat != CurrentFormat;
         public int RequiredKills => ReadInt("required");
         public int Progress => ReadInt("goal1Current");
         public bool IsReady => Step == 2 && Goals.Count > 0 && Goals[0].IsAchieved;
@@ -174,19 +195,26 @@ namespace DOL.GS.Quests
         public override void OnQuestAssigned(GamePlayer player)
         {
             QuestGiver = BountyMasterRuntime.GetMaster(player.Realm);
+            BountyDifficulty difficulty = BountyMasterRuntime.TakeOfferedDifficulty(player);
             string previousName = GetLastCompletedTargetName(player);
-            if (!Assign(player.Level, false, previousName))
+            if (!Assign(player.Level, false, previousName, difficulty))
             {
+                string kind = difficulty == BountyDifficulty.Normal || player.Level >= 50
+                    ? "bounty"
+                    : $"{BountyDifficultyRules.DisplayName(difficulty).ToLowerInvariant()} bounty";
                 player.Out.SendMessage(string.IsNullOrWhiteSpace(previousName)
-                        ? "No safe bounty could be selected right now. Please speak to the Bounty Master again."
-                        : "No different monster is eligible at this level right now. Your last hunt will not be assigned twice in a row.",
+                        ? $"No safe {kind} could be selected right now. Please speak to the Bounty Master again."
+                        : $"No different monster is eligible for a {kind} at this level right now. Your last hunt will not be assigned twice in a row.",
                     eChatType.CT_System, eChatLoc.CL_SystemWindow);
                 AbortQuest();
                 return;
             }
 
             base.OnQuestAssigned(player);
-            player.Out.SendMessage($"New bounty: {Target.Name} in {Target.ZoneName}. {RequiredKills} kill{(RequiredKills == 1 ? "" : "s")} required.",
+            string label = Difficulty == BountyDifficulty.Normal
+                ? "New bounty"
+                : $"New {BountyDifficultyRules.DisplayName(Difficulty).ToLowerInvariant()} bounty";
+            player.Out.SendMessage($"{label}: {Target.Name} in {Target.ZoneName}. {RequiredKills} kill{(RequiredKills == 1 ? "" : "s")} required.",
                 eChatType.CT_ScreenCenter, eChatLoc.CL_SystemWindow);
         }
 
@@ -194,7 +222,8 @@ namespace DOL.GS.Quests
         {
             if (e == GameLivingEvent.EnemyKilled && sender == m_questPlayer &&
                 args is EnemyKilledEventArgs killed && killed.Target is GameNPC npc && Step == 1 &&
-                Target?.Matches(npc) == true && Goals.Count > 0)
+                Target?.Matches(npc) == true && Goals.Count > 0 &&
+                BountyDifficultyRules.KillCounts(Difficulty, Target.Level, npc.Level))
             {
                 Goals[0].Advance();
                 if (Goals[0].IsAchieved)
@@ -209,23 +238,36 @@ namespace DOL.GS.Quests
             base.Notify(e, sender, args);
         }
 
-        /// <summary>Rerolls can be repeated, but the half-XP flag never clears.</summary>
-        public bool Reroll()
+        /// <summary>
+        /// Rerolls can be repeated, but the half-XP flag never clears. A reroll may
+        /// keep the difficulty or pick an easier one, and pays half of the new one.
+        /// </summary>
+        public bool Reroll(BountyDifficulty difficulty = BountyDifficulty.Normal)
         {
             if (m_questPlayer == null || Step is not (1 or 2))
                 return false;
 
+            if (AssignedLevel == 50)
+                difficulty = BountyDifficulty.Normal;
+            else if (difficulty > Difficulty)
+            {
+                m_questPlayer.Out.SendMessage("A reroll can only keep this bounty's difficulty or choose an easier one.",
+                    eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                return false;
+            }
+
             BountyTargetCandidate previous = Target;
-            if (!Assign(AssignedLevel, true, previous?.Name))
+            if (!Assign(AssignedLevel, true, previous?.Name, difficulty))
             {
                 m_questPlayer.Out.SendMessage("No different monster is available for this level right now. Your bounty and reward are unchanged.",
                     eChatType.CT_System, eChatLoc.CL_SystemWindow);
                 return false;
             }
 
+            int bulbs = BountyDifficultyRules.Bulbs(Difficulty, true);
             string rerollReward = AssignedLevel == 50
                 ? "The level-50 gold and gear reward is unchanged."
-                : "This contract now pays one XP bulb at its assigned level.";
+                : $"This {BountyDifficultyRules.DisplayName(Difficulty).ToLowerInvariant()} contract now pays {bulbs} XP bulb{(bulbs == 1 ? "" : "s")} at its assigned level.";
             m_questPlayer.Out.SendMessage($"New target: {Target.Name} in {Target.ZoneName}. {rerollReward}",
                 eChatType.CT_Important, eChatLoc.CL_SystemWindow);
             return true;
@@ -237,7 +279,8 @@ namespace DOL.GS.Quests
             if (m_questPlayer == null || m_questPlayer.Level <= AssignedLevel || Step is not (1 or 2))
                 return false;
 
-            if (!Assign(m_questPlayer.Level, false, null))
+            BountyDifficulty difficulty = m_questPlayer.Level >= 50 ? BountyDifficulty.Normal : Difficulty;
+            if (!Assign(m_questPlayer.Level, false, null, difficulty))
             {
                 m_questPlayer.Out.SendMessage("There are no suitable monsters at your present level. Your old bounty remains active.",
                     eChatType.CT_System, eChatLoc.CL_SystemWindow);
@@ -247,6 +290,76 @@ namespace DOL.GS.Quests
             m_questPlayer.Out.SendMessage($"Your old contract has been replaced without penalty. New target: {Target.Name} in {Target.ZoneName}.",
                 eChatType.CT_Important, eChatLoc.CL_SystemWindow);
             return true;
+        }
+
+        /// <summary>
+        /// Swaps a 0.33-or-older leveling bounty for a new-style hunt at the player's
+        /// level and any difficulty, free. A half-XP flag from an old reroll stays.
+        /// </summary>
+        public bool UpdateLegacy(BountyDifficulty difficulty)
+        {
+            if (m_questPlayer == null || !CanUpdateLegacy)
+                return false;
+
+            BountyTargetCandidate previous = Target;
+            if (!Assign((byte)m_questPlayer.Level, WasRerolled, previous?.Name, difficulty))
+            {
+                m_questPlayer.Out.SendMessage($"No {BountyDifficultyRules.DisplayName(difficulty).ToLowerInvariant()} bounty is available at your level right now. Your old bounty remains active.",
+                    eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                return false;
+            }
+
+            m_questPlayer.Out.SendMessage($"Your old contract has been updated without penalty. New {BountyDifficultyRules.DisplayName(Difficulty).ToLowerInvariant()} target: " +
+                $"{Target.Name} in {Target.ZoneName}, {RequiredKills} kills.",
+                eChatType.CT_Important, eChatLoc.CL_SystemWindow);
+            return true;
+        }
+
+        /// <summary>
+        /// Called when the player enters the world. A bounty saved by 0.33 or
+        /// earlier keeps its target as a Normal hunt but needs only the new kill
+        /// count; a great-foe bounty is unchanged and simply marked current.
+        /// </summary>
+        public void NormalizeLegacyOnLogin()
+        {
+            if (m_questPlayer == null || !IsLegacyFormat || Step is not (1 or 2))
+                return;
+
+            if (AssignedLevel is < 1 or >= 50)
+            {
+                SetCustomProperty("format", CurrentFormat);
+                return;
+            }
+
+            (int required, int progress) = LegacyKillCounts(AssignedLevel, RequiredKills, Progress);
+            if (required != RequiredKills || progress != Progress)
+            {
+                lock (m_customProperties)
+                {
+                    m_customProperties["required"] = required.ToString();
+                    m_customProperties["goal1Current"] = progress.ToString();
+                    SaveCustomProperties();
+                }
+
+                RestoreGoal();
+                if (Step == 1 && progress >= required)
+                    Step = 2;
+                m_questPlayer.Out.SendQuestUpdate(this);
+                BountyMasterRuntime.UpdateIndicator(m_questPlayer);
+            }
+
+            string update = CanUpdateLegacy
+                ? " Your Bounty Master can also update it once, free, to a normal, hard or very hard hunt."
+                : string.Empty;
+            m_questPlayer.Out.SendMessage($"Your bounty is from an older version and now needs {required} kills ({progress}/{required}).{update}",
+                eChatType.CT_System, eChatLoc.CL_SystemWindow);
+        }
+
+        /// <summary>An old saved kill count drops to the new bracket; progress never exceeds it.</summary>
+        public static (int Required, int Progress) LegacyKillCounts(byte assignedLevel, int savedRequired, int savedProgress)
+        {
+            int required = Math.Min(Math.Max(savedRequired, 1), RequiredKillsForLevel(assignedLevel));
+            return (required, Math.Clamp(savedProgress, 0, required));
         }
 
         public bool Claim()
@@ -260,7 +373,7 @@ namespace DOL.GS.Quests
                     return false;
 
                 string completedTargetName = Target?.Name;
-                BountyRewardResult reward = BountyRewardService.Grant(m_questPlayer, AssignedLevel, WasRerolled);
+                BountyRewardResult reward = BountyRewardService.Grant(m_questPlayer, AssignedLevel, WasRerolled, Difficulty);
                 if (!reward.Granted)
                 {
                     m_questPlayer.Out.SendMessage(reward.Reason ?? "Your bounty reward cannot be delivered yet.",
@@ -315,11 +428,15 @@ namespace DOL.GS.Quests
             return BountyTargetCatalog.ExcludeMonsterName(pool, previousName);
         }
 
-        private bool Assign(byte level, bool rerolled, string previousName)
+        private bool Assign(byte level, bool rerolled, string previousName,
+            BountyDifficulty difficulty = BountyDifficulty.Normal)
         {
+            if (level >= 50)
+                difficulty = BountyDifficulty.Normal;
+
             IReadOnlyList<BountyTargetCandidate> pool = level == 50
                 ? BountyTargetCatalog.GetEpicCandidates(m_questPlayer.Realm)
-                : BountyTargetCatalog.GetEligible(m_questPlayer.Realm, level, previousName);
+                : BountyTargetCatalog.GetEligible(m_questPlayer.Realm, level, previousName, difficulty);
             if (pool.Count == 0)
                 return false;
 
@@ -347,6 +464,8 @@ namespace DOL.GS.Quests
                 m_customProperties["epic"] = target.IsEpic ? "1" : "0";
                 m_customProperties["required"] = required.ToString();
                 m_customProperties["rerolled"] = rerolled ? "1" : "0";
+                m_customProperties["difficulty"] = BountyDifficultyRules.Save(difficulty);
+                m_customProperties["format"] = CurrentFormat;
                 m_customProperties["goal1Current"] = "0";
                 SaveCustomProperties();
             }
@@ -424,9 +543,15 @@ namespace DOL.GS.Quests
                 goal.SetWaypoint(zone.ID, target.X - zone.XOffset, target.Y - zone.YOffset);
         }
 
-        public static int RequiredKillsForLevel(int level) => level >= 50
-            ? 1
-            : Math.Clamp(5 + (int)Math.Round((level - 1) * 45d / 48d, MidpointRounding.AwayFromZero), 5, 50);
+        /// <summary>Kills needed on every difficulty: 5 below level 20, then 10, 15 and 20 in the 20s, 30s and 40s.</summary>
+        public static int RequiredKillsForLevel(int level) => level switch
+        {
+            >= 50 => 1,
+            >= 40 => 20,
+            >= 30 => 15,
+            >= 20 => 10,
+            _ => 5
+        };
 
         private static string Safe(string value) => (value ?? string.Empty).Replace(';', ',').Replace('=', '-');
 

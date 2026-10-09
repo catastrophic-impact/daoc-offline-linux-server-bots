@@ -15,7 +15,7 @@ namespace DOL.GS
         public static bool IsSharedFrontierDungeon(ushort region) => region is 246 or 248 or 276 or 277;
         public static bool IsSharedCombatDungeon(ushort region) => IsSharedFrontierDungeon(region) || region == 249;
         public static bool IsSupportedDungeonZone(ushort zone) => zone is
-            19 or 21 or 22 or 23 or 24 or 60 or 61 or 62 or
+            19 or 21 or 22 or 23 or 24 or 50 or 60 or 61 or 62 or
             125 or 126 or 127 or 128 or 129 or 150 or 160 or 161 or
             180 or 190 or 191 or 220 or 221 or 222 or 223 or 224 or
             246 or 248 or 276 or 277 ||
@@ -72,7 +72,14 @@ namespace DOL.GS
             // Installed entrance-to-husk corridors cross aggressive level
             // 36-43 packs. Level 10-11 husks cannot be safe XP goals for the
             // low-level bots that qualify for them. Do not alter any monsters.
-            !(region == 125 && string.Equals(name, "husk", StringComparison.OrdinalIgnoreCase));
+            !(region == 125 && string.Equals(name, "husk", StringComparison.OrdinalIgnoreCase)) &&
+            // Summoner's Hall is reachable only through Dodens Gruva, Hall of the
+            // Corrupt or Marfach Caverns. Groups spent their whole task fighting
+            // through those first: 1 of 268 attempts arrived in one evening run.
+            // Its monsters and routes stay for players; bots never target it.
+            region != SummonersHallRegion;
+
+        public const ushort SummonersHallRegion = 248;
 
         // A monster may be geometrically close to the route through a wall or
         // from a disconnected room polygon.  Visibility alone is insufficient:

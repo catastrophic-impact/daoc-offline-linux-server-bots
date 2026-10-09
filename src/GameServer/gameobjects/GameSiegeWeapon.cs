@@ -241,7 +241,8 @@ namespace DOL.GS
 		}
 		private bool TryTakeControlCore(GameLiving player)
 		{
-			if (player is not GamePlayer && (player is not GameBot { IsAutonomousWorldBot: true } && (this is not GameSiegeRam || player is not IGamePlayer)))
+			if (player is not GamePlayer && (player is not GameBot { IsAutonomousWorldBot: true } && (this is not GameSiegeRam || player is not IGamePlayer)) &&
+				!(player is GameBot raidBot && CompanionRaid.IsMember(raidBot)))
 				return false;
 			if (player is GameBot bot && (!bot.IsAlive || !IsAlive || ObjectState != eObjectState.Active ||
 				Realm != bot.Realm || !IsWithinRadius(bot, SIEGE_WEAPON_CONTROLE_DISTANCE) ||

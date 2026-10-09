@@ -190,6 +190,26 @@ namespace DOL.GS
 				player.DismountSteed(true);
 		}
 
+		/// <summary>
+		/// Riders, plus - for a bot-operated ram - the operator's group members standing at the ram (bots cannot mount;
+		/// owner 2026-10-07: players crewed rams and bot crews must break doors in a sensible time). Up to the ram's places.
+		/// </summary>
+		public int Crew
+		{
+			get
+			{
+				int crew = CurrentRiders.Length;
+				// A gamebot ram is crewed by any friendly gamebot at it, not only the operator's own group (run 2026-10-07:
+				// Midgard's ram at Caer Erasleigh ran on one bot while its army fought beside it).
+				if (Owner is GameBot op && (op.Group != null || op.IsAutonomousWorldBot))
+					foreach (GameNPC npc in GetNPCsInRadius(300))
+						if (npc is GameBot member && member != op && member.IsAlive && member.Realm == Realm &&
+							(op.Group?.IsInTheGroup(member) == true || op.IsAutonomousWorldBot && member.IsAutonomousWorldBot))
+							crew++;
+				return System.Math.Min(MAX_PASSENGERS, crew);
+			}
+		}
+
 		public void UpdateRamStatus()
 		{
 			//speed of reload/arming changed by number of riders
@@ -201,14 +221,14 @@ namespace DOL.GS
 			get
 			{
 				//custom formula
-				return 10000 + ((Level + 1) * 2000) - (int)(10000 * ((double)CurrentRiders.Length / (double)MAX_PASSENGERS));
+				return 10000 + ((Level + 1) * 2000) - (int)(10000 * ((double)Crew / (double)MAX_PASSENGERS));
 			}
 		}
 
 		public override int CalcDamageToTarget(GameLiving target)
 		{
 			//return BaseDamage + (int)(((double)BaseDamage / 2.0) * (double)((double)CurrentRiders.Length / (double)MAX_PASSENGERS));
-			return BaseDamage + (BaseDamage/2 * CurrentRiders.Length);
+			return BaseDamage + (BaseDamage/2 * Crew);
 		}
 
 		public override int BaseDamage

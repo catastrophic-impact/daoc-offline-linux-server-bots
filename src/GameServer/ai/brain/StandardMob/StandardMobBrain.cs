@@ -785,16 +785,26 @@ namespace DOL.AI.Brain
             }
 
             GamePlayer playerPuller;
+            GameLiving countFrom = puller; // Group members are counted within visibility of this living.
 
-            // Only BAF on players and pets of players
+            // Only BAF on players, pets of players and the player's companion bots (and their pets).
             if (puller is GamePlayer player)
                 playerPuller = player;
+            else if (CompanionBringAFriend.Enabled && CompanionBringAFriend.IsCompanion(puller))
+                playerPuller = ((GameBot) puller).Owner;
             else if (puller is GameNPC pet && pet.Brain is ControlledMobBrain brain)
             {
                 playerPuller = brain.GetPlayerOwner();
 
                 if (playerPuller == null)
                     return;
+
+                // A companion's pet resolves to the player; only count it when companions count.
+                GameLiving petOwner = brain.Owner;
+                if (petOwner is GameBot && !(CompanionBringAFriend.Enabled && CompanionBringAFriend.IsCompanion(petOwner)))
+                    return;
+
+                countFrom = petOwner is GameBot ? petOwner : playerPuller;
             }
             else
                 return;
@@ -805,7 +815,7 @@ namespace DOL.AI.Brain
 
             _ = new ResetBafPropertyAction(playerPuller);
             CanBaf = false; // Mobs only BAF once per fight.
-            int maxAdds = GetMaxAddsCountFromBaf(playerPuller, out List<GamePlayer> otherTargets, out int attackersCount);
+            int maxAdds = GetMaxAddsCountFromBaf(playerPuller, countFrom, out List<GameLiving> otherTargets, out int attackersCount);
             int bafRadius = BAF_MIN_RADIUS + (Math.Min(8, attackersCount) - 1) * BAF_EXTRA_RADIUS_PER_OTHER_PLAYER;
 
             if (Body.CurrentZone.IsDungeon)
@@ -830,7 +840,7 @@ namespace DOL.AI.Brain
                 brain.AddToAggroList(target);
             }
 
-            static int GetMaxAddsCountFromBaf(GamePlayer puller, out List<GamePlayer> otherTargets, out int attackersCount)
+            static int GetMaxAddsCountFromBaf(GamePlayer puller, GameLiving countFrom, out List<GameLiving> otherTargets, out int attackersCount)
             {
                 attackersCount = 0;
                 otherTargets = null;
@@ -855,17 +865,21 @@ namespace DOL.AI.Brain
                             otherTargets = new(group.MemberCount);
                     }
 
-                    foreach (GamePlayer playerInGroup in group.GetPlayersInTheGroup())
+                    // Players and the player's companion bots count; a /raid 40 or 80 is one big
+                    // group, so the adds scale with the raid size (CompanionBringAFriend).
+                    foreach (GameLiving memberInGroup in group.GetMembersInTheGroup())
                     {
-                        if (playerInGroup != null && (playerInGroup.InternalID == puller.InternalID || playerInGroup.IsWithinRadius(puller, WorldMgr.VISIBILITY_DISTANCE, true)))
+                        if (memberInGroup != null && CompanionBringAFriend.Counts(memberInGroup) &&
+                            (memberInGroup == countFrom || memberInGroup.InternalID == puller.InternalID ||
+                             memberInGroup.IsWithinRadius(countFrom, WorldMgr.VISIBILITY_DISTANCE, true)))
                         {
                             attackersCount++;
-                            countedAttackers?.Add(playerInGroup.InternalID);
+                            countedAttackers?.Add(memberInGroup.InternalID);
 
                             if (otherTargets != null)
                             {
-                                otherTargets.Add(playerInGroup);
-                                countedVictims?.Add(playerInGroup.InternalID);
+                                otherTargets.Add(memberInGroup);
+                                countedVictims?.Add(memberInGroup.InternalID);
                             }
                         }
                     }
@@ -878,7 +892,7 @@ namespace DOL.AI.Brain
 
                     foreach (GamePlayer player2 in bg.Members.Keys)
                     {
-                        if (player2 != null && (player2.InternalID == puller.InternalID || player2.IsWithinRadius(puller, WorldMgr.VISIBILITY_DISTANCE, true)))
+                        if (player2 != null && (player2.InternalID == puller.InternalID || player2.IsWithinRadius(countFrom, WorldMgr.VISIBILITY_DISTANCE, true)))
                         {
                             if (Properties.BAF_MOBS_COUNT_BG_MEMBERS && (countedAttackers == null || !countedAttackers.Contains(player2.InternalID)))
                                 attackersCount++;
@@ -893,7 +907,7 @@ namespace DOL.AI.Brain
                 if (attackersCount == 0)
                     attackersCount = 1;
 
-                int percentBAF = Properties.BAF_INITIAL_CHANCE + (attackersCount - 1) * Properties.BAF_ADDITIONAL_CHANCE;
+                int percentBAF = CompanionBringAFriend.ChancePercent(attackersCount, Properties.BAF_INITIAL_CHANCE, Properties.BAF_ADDITIONAL_CHANCE);
                 int maxAdds = percentBAF / 100; // Multiple of 100 are guaranteed BAFs.
 
                 // Calculate chance of an addition add based on the remainder.
@@ -1475,6 +1489,13 @@ namespace DOL.AI.Brain
 
                 return false;
             }
+
+            // Pets: a DoT from a different effect group stacks (e.g. the Sluaghbinder
+            // Dullahan's Grave Rot beside its owner's Rot and Bane), so only a
+            // conflicting DoT blocks it. Wild mobs keep the stock category check.
+            if (spellEffect == eEffect.DamageOverTime && this is IControlledBrain)
+                return target.effectListComponent.GetSpellEffects(spellEffect)
+                    .Any(effect => effect?.SpellHandler?.Spell is Spell existing && BotBrain.DotsConflict(spell, existing));
 
             // True if the target has the effect, or the immunity effect for this effect.
             // Treat NPC immunity effects as full immunity effects.

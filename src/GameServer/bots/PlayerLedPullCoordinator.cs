@@ -56,8 +56,11 @@ namespace DOL.GS
                     ? "Raid PvP target ordered: attackers and pets engage; healers support."
                     : "Defensive mode: target remembered. Bring it within 350 units, or use /aggressive to engage at range.";
             }
-            if (helpers.Any(bot => bot.IsTemporaryCompanionRestLocked))
-                return "Party is resting; the pull will be available when everyone has recovered.";
+            // /pull is a manual order: it fires now. Resting companions stand up
+            // instead of vetoing it (a chanting Paladin or Bard never refills, so
+            // the old "party is resting" refusal could block /pull forever).
+            foreach (GameBot bot in helpers.Where(bot => bot.IsTemporaryCompanionRestLocked))
+                bot.WakeTemporaryCompanionRest();
             GameBot tank = helpers.Where(BotPartyRoles.IsTank)
                 .Where(bot => !bot.IsCrowdControlled)
                 .OrderBy(bot => bot.GetDistanceTo(target)).ThenBy(bot => bot.ObjectID).FirstOrDefault();

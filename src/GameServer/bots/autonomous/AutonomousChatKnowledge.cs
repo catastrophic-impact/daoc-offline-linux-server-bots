@@ -154,7 +154,7 @@ public static class AutonomousChatKnowledge
                 string sourceArea = source?.GetZone(entrance.SourceX, entrance.SourceY)?.Description ?? source?.Description;
                 if (!string.IsNullOrWhiteSpace(sourceArea))
                 {
-                    answer = $"The {realm} entrance to {place.Name} is in {sourceArea}. Travel together and clear the approach carefully.";
+                    answer = $"The {GlobalConstants.RealmToName(realm)} entrance to {place.Name} is in {sourceArea}. Travel together and clear the approach carefully.";
                     return true;
                 }
             }

@@ -44,6 +44,8 @@ namespace DOL.UnitTests
         [TestCase(eCharacterClass.Cabalist, true)]
         [TestCase(eCharacterClass.Enchanter, false)]
         [TestCase(eCharacterClass.Enchanter, true)]
+        [TestCase(eCharacterClass.Spiritmaster, false)]
+        [TestCase(eCharacterClass.Spiritmaster, true)]
         public void EveryShieldRankIsRejectedAndDamageSpellRemainsSelectable(eCharacterClass characterClass, bool companion)
         {
             Bot bot = Create(characterClass);
@@ -65,7 +67,6 @@ namespace DOL.UnitTests
             Assert.That(bot.HarmfulSpells, Does.Contain(damage));
         }
 
-        [TestCase(eCharacterClass.Spiritmaster)]
         [TestCase(eCharacterClass.Bonedancer)]
         public void OtherPetClassesKeepExistingSpellPolicy(eCharacterClass characterClass)
         {

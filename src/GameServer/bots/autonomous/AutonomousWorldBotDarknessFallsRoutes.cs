@@ -251,6 +251,30 @@ public sealed partial class AutonomousWorldBotController
         return true;
     }
 
+    /// <summary>
+    /// A raid member inside Darkness Falls whose post is not one proven leg away walks the realm's
+    /// certified chain down to it, like the raid front did (late members used to retry a direct
+    /// path from the entrance floor forever, 2026-10-06). False: no chain needed or none found.
+    /// </summary>
+    private bool FollowDarknessFallsRaidChain(GameBot bot, Vector3 post, string status)
+    {
+        Zone zone = bot.CurrentZone;
+        IPathfindingMgr nav = PathfindingProvider.Instance;
+        if (bot.CurrentRegionID != AutonomousDarknessFallsPolicy.RegionId || zone == null ||
+            !nav.IsAvailable || !nav.HasNavmesh(zone))
+            return false;
+        Vector3 current = new(bot.X, bot.Y, bot.Z);
+        string key = $"raid:{bot.Realm}:{(int)post.X >> 6}:{(int)post.Y >> 6}:{(int)post.Z >> 6}";
+        if (!string.Equals(_darknessFallsRouteKey, key, StringComparison.Ordinal))
+        {
+            if (AutonomousDarknessFallsNavigation.HasStrictSegment(nav, zone, current, post)) return false;
+            if (!RealmRaidDungeonRoute.TryDarknessFallsChain(nav, zone, bot.Realm, post, out Vector3[] chain) ||
+                !StartDarknessFallsRoute(bot, key, chain))
+                return false;
+        }
+        return AdvanceDarknessFallsRoute(bot, status);
+    }
+
     private bool StartDarknessFallsRoute(GameBot bot, string key, Vector3[] waypoints)
     {
         Zone zone = bot.CurrentZone;

@@ -1118,6 +1118,12 @@ namespace DOL.GS
 
         protected virtual bool DyeItem(DbInventoryItem dye, DbInventoryItem objectToDye)
         {
+            if (DOL.GS.Quests.Hibernia.SluaghbinderEpicArmor.IsSetItem(objectToDye))
+            {
+                m_player?.Out.SendMessage(DOL.GS.Quests.Hibernia.SluaghbinderEpicArmor.DyeRefusal, eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                return false;
+            }
+
             bool canApply = false;
             //TODO should not be tested via model
 

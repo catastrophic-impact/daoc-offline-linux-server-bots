@@ -16,12 +16,15 @@ namespace DOL.GS
                 yield break;
 
             int range = spell.Range == 0 ? spell.Radius : spell.CalculateEffectiveRange(caster);
-            var visited = new HashSet<IControlledBrain>();
+            HashSet<IControlledBrain> visited = null;
             IEnumerable<GameLiving> members = spell.Target == eSpellTarget.REALM
                 ? AutonomousRealmRaid.SupportMembers(caster) : group.GetMembersInTheGroup();
             object supportScope = AutonomousRealmRaid.SupportScope(caster);
             foreach (GameLiving member in members)
             {
+                // Most members have no pet; skip them before the ownership walk (raid buffs check up to 80 members).
+                if (member?.ControlledBrain == null)
+                    continue;
                 // Event rosters are snapshots. A departed member must not leave
                 // its pet eligible until the next roster rebuild. Cross-party
                 // Realm buffs require the same still-active event, not merely
@@ -34,6 +37,7 @@ namespace DOL.GS
                 // Match native GROUP expansion: the owner must be in range too.
                 if (spell.Target == eSpellTarget.GROUP && !caster.IsWithinRadius(member, range))
                     continue;
+                visited ??= new HashSet<IControlledBrain>();
                 foreach (GameNPC pet in AttachedTree(member.ControlledBrain, member, visited,
                              spell.Target == eSpellTarget.GROUP ? 2 : 16))
                 {

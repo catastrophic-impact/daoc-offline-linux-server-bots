@@ -54,8 +54,28 @@ public static class AutonomousBotRealmPointRewards
         return Math.Max(0, realmPoints);
     }
 
+    private static readonly DOL.Logging.Logger RvrLog = DOL.Logging.LoggerManager.Create(typeof(AutonomousBotRealmPointRewards));
+
+    /// <summary>
+    /// RVR_BOT_KILLED: every gamebot killed by another realm (bot, player, pet or guard), with its siege event
+    /// force and where it fell. Siege armies were losing half their strength on the march with no record of it
+    /// (run 17, Caer Sursbrooke).
+    /// </summary>
+    private static void LogRvrDeath(GameBot victim, GameObject killer)
+    {
+        if (victim?.IsAutonomousWorldBot != true || killer is not GameLiving living || !RvrLog.IsInfoEnabled) return;
+        GameLiving owner = ResolveRootRewardOwner(living) ?? living;
+        if (owner.Realm == eRealm.None || owner.Realm == victim.Realm) return;
+        string force = victim.TempProperties.GetProperty<string>("RvrEventForce") ?? "";
+        RvrLog.Info($"RVR_BOT_KILLED victim={victim.Name} id={victim.DatabaseID} realm={GlobalConstants.RealmToName(victim.Realm)} " +
+                    $"goal={AutonomousObjectiveAssignments.KindFor(victim)} force={force} killer=\"{owner.Name}\" killerRealm={GlobalConstants.RealmToName(owner.Realm)} " +
+                    $"killerType={owner.GetType().Name} region={victim.CurrentRegionID} zone=\"{victim.CurrentZone?.Description}\" " +
+                    $"at={victim.X},{victim.Y},{victim.Z}");
+    }
+
     public static void Award(GameBot killedBot, GameObject killer)
     {
+        LogRvrDeath(killedBot, killer);
         if (!IsEligibleVictim(killedBot))
             return;
 
@@ -88,6 +108,10 @@ public static class AutonomousBotRealmPointRewards
         double totalDamage = hostileContributors.Sum(pair => pair.Value);
         if (totalDamage <= 0)
             return;
+
+        int victimRealmPointValue = GetPlayerEquivalentRealmPointValue(killedBot.Level, killedBot.RealmLevel);
+        if (isWorthRealmPoints)
+            PayGamebots(killedBot, victimRealmPointValue, killedBot.RealmLevel, hostileContributors, totalDamage);
 
         Dictionary<GamePlayer, EntityCountTotalDamagePair> playerContributions = new();
         Dictionary<Group, EntityCountTotalDamagePair> groupContributions = new();
@@ -142,7 +166,7 @@ public static class AutonomousBotRealmPointRewards
                 }
                 else
                 {
-                    player.Out.SendMessage($"{killedBot.Name} has been killed recently and is worth no realm points!",
+                    player.Out.SendMessage($"{AutonomousNameMask.NameFor(player, killedBot, 0, true)} has been killed recently and is worth no realm points!",
                         eChatType.CT_Important, eChatLoc.CL_SystemWindow);
                 }
 
@@ -151,6 +175,58 @@ public static class AutonomousBotRealmPointRewards
                 player.UpdateKillStatsOnPlayerKill(killedBot.Realm, deathBlow, soloKill, realmPointsEarned);
             }
         }
+    }
+
+    /// <summary>
+    /// Gamebots earn realm points for PvP kills like players: a share of the victim's value by
+    /// their part of the damage, with the same group bonus. Only persistent gamebots of a hostile
+    /// realm within reward range (pets resolve to their bot).
+    /// </summary>
+    public static void PayGamebots(GameLiving victim, int victimRealmPointValue, int victimRealmLevel,
+        IReadOnlyDictionary<GameLiving, double> hostileContributors, double totalDamage)
+    {
+        if (victim == null || victimRealmPointValue <= 0 || totalDamage <= 0) return;
+        var bots = hostileContributors
+            .Where(pair => pair.Key is GameBot { IsAutonomousWorldBot: true, IsTemporaryGroupHelper: false } bot &&
+                bot.Realm != eRealm.None && bot.Realm != victim.Realm && bot.ObjectState == GameObject.eObjectState.Active &&
+                bot.IsWithinRadius(victim, WorldMgr.MAX_EXPFORKILL_DISTANCE))
+            .Select(pair => (Bot: (GameBot)pair.Key, Damage: pair.Value)).ToArray();
+        foreach (var (bot, damage) in bots)
+        {
+            int groupCount = bot.Group == null ? 1 : Math.Max(1, bots.Count(other => other.Bot.Group == bot.Group));
+            double groupDamage = bot.Group == null ? damage : bots.Where(other => other.Bot.Group == bot.Group).Sum(other => other.Damage);
+            int points = CalculateRealmPointReward(victimRealmPointValue, victimRealmLevel,
+                GetPlayerEquivalentRealmPointValue(bot.Level, bot.RealmLevel), bot.RealmLevel,
+                groupCount, groupCount, Math.Min(1.0, groupDamage / totalDamage), true);
+            if (points > 0) bot.GainRealmPoints(points, true);
+        }
+    }
+
+    /// <summary>A player killed in PvP pays the gamebots that fought them (players are paid by the rules).</summary>
+    public static void PayGamebotsForPlayerKill(GamePlayer killedPlayer)
+    {
+        if (killedPlayer == null) return;
+        KeyValuePair<GameLiving, double>[] raw;
+        lock (killedPlayer.XpGainersLock)
+            raw = killedPlayer.XPGainers.ToArray();
+        var hostile = new Dictionary<GameLiving, double>();
+        foreach (var pair in raw)
+        {
+            GameLiving credited = ResolveRootRewardOwner(pair.Key);
+            if (credited == null || credited.Realm == eRealm.None || credited.Realm == killedPlayer.Realm) continue;
+            hostile[credited] = hostile.GetValueOrDefault(credited) + pair.Value;
+        }
+        PayGamebots(killedPlayer, killedPlayer.RealmPointsValue, killedPlayer.RealmLevel, hostile, hostile.Sum(pair => pair.Value));
+    }
+
+    /// <summary>Realm level for a realm point total, from the player table (RR1L0 = 0 ... RR5L3 = 43).</summary>
+    public static int RealmLevelFor(long realmPoints)
+    {
+        if (realmPoints <= 0) return 0;
+        long[] table = GamePlayer.REALMPOINTS_FOR_LEVEL;
+        for (int level = table.Length - 1; level > 0; level--)
+            if (table[level] <= realmPoints) return level;
+        return 0;
     }
 
     public static GameLiving ResolveRootRewardOwner(GameLiving source)

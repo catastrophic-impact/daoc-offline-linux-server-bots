@@ -151,6 +151,7 @@ namespace DOL.GS.Scripts
             
             message += "\n\n" +
                        "Perhaps you would like the challenge of the [Epic Dungeon]?";
+            message += BattlegroundTeleportOptions.MenuLine;
 
             SayTo(player, message);
 
@@ -422,6 +423,13 @@ namespace DOL.GS.Scripts
                         GetTeleportLocation(player, "Galladoria");
                         return true;
                 }
+            }
+
+            // Battlegrounds: only the bracket matching the player's level and realm rank.
+            if (BattlegroundTeleportOptions.TryHandle(this, player, text, player.Realm, out DbTeleport battleground))
+            {
+                if (battleground != null) OnDestinationPicked(player, battleground);
+                return false;
             }
 
             // Find the teleport location in the database.

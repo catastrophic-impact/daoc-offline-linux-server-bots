@@ -7,21 +7,37 @@ namespace DOL.GS;
 public static class AutonomousBotGoalPolicy
 {
     public static BotGoalSettings Settings { get; private set; } = BotGoalSettings.Defaults;
+    public const string OverrideVariable = "OFFLINE_DAOC_BOT_GOALS";
     public static bool IsConfigured { get; private set; }
 
     // One startup read only. Never poll settings or query the database on AI turns.
     public static void Initialize(string serverDirectory)
     {
         string path = Path.Combine(serverDirectory, BotGoalSettings.FileName);
+        // Test runs may point at their own goals file so the owner's saved launcher setting
+        // (bot-goals.json) is never edited for a test.
+        string overridePath = Environment.GetEnvironmentVariable(OverrideVariable);
+        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
+        {
+            path = overridePath;
+            DOL.Logging.LoggerManager.Create(typeof(AutonomousBotGoalPolicy)).Warn($"BOT_GOALS_OVERRIDE using {overridePath} instead of {BotGoalSettings.FileName}");
+        }
         Settings = BotGoalSettings.Load(path); // Reject corruption rather than silently ignoring 0% exclusions.
         IsConfigured = File.Exists(path);
     }
 
-    public static eAutonomousObjectiveKind Choose(int level, Random random = null, bool excludeGroup = false) =>
-        (eAutonomousObjectiveKind)Settings.ForLevel(level).Choose((random ?? Random.Shared).NextDouble(), excludeGroup);
+    public static eAutonomousObjectiveKind Choose(int level, Random random = null, bool excludeGroup = false,
+        bool excludeBattlegrounds = false) =>
+        (eAutonomousObjectiveKind)Settings.ForLevel(level).Choose((random ?? Random.Shared).NextDouble(), excludeGroup,
+            excludeBattlegrounds || !BattlegroundBrackets.LevelHasBracket(level));
+
+    // A battleground goal also needs a bracket for the level (15-35); level is the only battleground limit.
+    public static bool Allows(int level, eAutonomousObjectiveKind kind) =>
+        Settings.ForLevel(level).Allows((int)kind) &&
+        (kind != eAutonomousObjectiveKind.Battleground || BattlegroundBrackets.LevelHasBracket(level));
 
     public static eAutonomousObjectiveKind EnsureAllowed(int level, eAutonomousObjectiveKind kind) =>
-        Settings.ForLevel(level).Allows((int)kind) ? kind : Choose(level);
+        Allows(level, kind) ? kind : Choose(level);
 
     // Called before an autonomous actor can enter the world. Keep inventory,
     // position, XP and valid saved task clocks; discard only a now-disabled task.
@@ -35,7 +51,7 @@ public static class AutonomousBotGoalPolicy
             changed = true;
         }
         if (!AutonomousObjectiveAssignments.IsBetweenPveTasks(record) &&
-            !Settings.ForLevel(record.Level).Allows((int)AutonomousObjectiveAssignments.Parse(record.ObjectiveKind)))
+            !Allows(record.Level, AutonomousObjectiveAssignments.Parse(record.ObjectiveKind)))
         {
             record.ObjectiveKind = Choose(record.Level).ToString();
             record.ObjectiveAssignmentId = string.Empty;

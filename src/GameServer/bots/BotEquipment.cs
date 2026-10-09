@@ -65,13 +65,20 @@ namespace DOL.GS
             return item;
         }
 
+        // Templates marked for this realm but built on another realm's model (a
+        // Midgard hat on the Hibernia mesh has no Valkyn or Troll fit). Bots skip them.
+        private static IList<DbItemTemplate> WithoutCrossRealmLooks(IList<DbItemTemplate> items) =>
+            items.Where(item => !BotCrossRealmGear.IsExcluded(item) &&
+                                !DOL.GS.Quests.Hibernia.SluaghbinderEpicArmor.IsSetItem(item)).ToList();
+
         public static DbItemTemplate SelectCompanionWeapon(IEnumerable<DbItemTemplate> candidates, byte level,
             eRealm realm, eCharacterClass characterClass, eObjectType type, eInventorySlot slot,
             eWeaponDamageType damage = 0, int shieldSize = 0)
         {
             // Select exact level first, then -1, then -2. A failed database lookup
             // generates a temporary item, never an empty hand or an overlevel item.
-            var eligible = candidates.Where(item => item != null && item.MaxCount == 1 &&
+            var eligible = candidates.Where(item => item != null && !BotCrossRealmGear.IsExcluded(item) &&
+                !DOL.GS.Quests.Hibernia.SluaghbinderEpicArmor.IsSetItem(item) && item.MaxCount == 1 &&
                 BotWeaponStats.IsNormalCompanionWeapon(item) &&
                 item.Level >= Math.Max(1, level - 2) && item.Level <= level &&
                 item.Realm == (int)realm && item.Object_Type == (int)type && item.IsPickable &&
@@ -201,6 +208,7 @@ namespace DOL.GS
                                                                        DB.Column("Object_Type").IsEqualTo((int)weapType).And(
                                                                        DB.Column("Realm").IsEqualTo((int)player.Realm)).And(
                                                                        DB.Column("IsPickable").IsEqualTo(1)))));
+            itemList = WithoutCrossRealmLooks(itemList);
 
             if (itemList.Count != 0)
             {
@@ -257,6 +265,7 @@ namespace DOL.GS
                                                                        DB.Column("Item_Type").IsEqualTo(13).And(
                                                                        DB.Column("Realm").IsEqualTo((int)player.Realm)).And(
                                                                        DB.Column("IsPickable").IsEqualTo(1))))));
+            itemList = WithoutCrossRealmLooks(itemList);
 
             itemList = itemList.Where(BotRangedCombat.IsUsableTemplate).ToList();
             if (itemList.Count != 0)
@@ -289,6 +298,7 @@ namespace DOL.GS
                                                                        DB.Column("Realm").IsEqualTo((int)player.Realm)).And(
                                                                        DB.Column("Type_Damage").IsEqualTo(shieldSize).And(
                                                                        DB.Column("IsPickable").IsEqualTo(1))))));
+            itemList = WithoutCrossRealmLooks(itemList);
 
             if (itemList.Count != 0)
             {
@@ -315,6 +325,7 @@ namespace DOL.GS
                                                                        DB.Column("Object_Type").IsEqualTo((int)armorType).And(
                                                                        DB.Column("Realm").IsEqualTo((int)player.Realm)).And(
                                                                        DB.Column("IsPickable").IsEqualTo(1)))));
+            itemList = WithoutCrossRealmLooks(itemList);
 
             if (itemList.Count != 0)
             {
@@ -369,6 +380,7 @@ namespace DOL.GS
                                                                        DB.Column("DPS_AF").IsEqualTo((int)instrumentType).And(
                                                                        DB.Column("Realm").IsEqualTo((int)player.Realm)).And(
                                                                        DB.Column("IsPickable").IsEqualTo(1))))));
+            itemList = WithoutCrossRealmLooks(itemList);
 
             if (itemList.Count != 0)
             {
@@ -398,6 +410,7 @@ namespace DOL.GS
                                                                        DB.Column("Object_Type").IsEqualTo((int)eObjectType.Magical).And(
                                                                        DB.Column("Realm").IsEqualTo((int)player.Realm)).And(
                                                                        DB.Column("IsPickable").IsEqualTo(1)))));
+            itemList = WithoutCrossRealmLooks(itemList);
 
             if (itemList.Count != 0)
             {

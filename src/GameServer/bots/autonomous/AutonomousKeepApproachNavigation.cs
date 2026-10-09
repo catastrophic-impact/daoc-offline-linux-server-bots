@@ -17,8 +17,11 @@ public sealed class AutonomousKeepApproachNavigation : PathfindingMgrBase
     {
         if (nav == null || nav is AutonomousKeepApproachNavigation) return nav;
         if (realm==eRealm.None || region==null) return new AutonomousKeepApproachNavigation(nav,[]);
+        // Owner tests 2026-10-07 (Nottmoor Faste, Caer Erasleigh): once the outer gate was broken, every ram spot at
+        // the keep door read "unconnected" because the broken gate still counted as a closed enemy door. A door that
+        // is broken or standing open is passable like a friendly one; the mover walks through it.
         var doors = GameServer.KeepManager?.GetKeepsOfRegion(region.ID)
-            .Where(k => k.Realm == realm).SelectMany(k => k.Doors.Values)
+            .SelectMany(k => k.Doors.Values.Where(d => k.Realm == realm || !d.IsAlive || d.State == eDoorState.Open))
             .Select(d => new Vector3(d.X,d.Y,d.Z)).ToArray() ?? [];
         return new AutonomousKeepApproachNavigation(nav, doors);
     }

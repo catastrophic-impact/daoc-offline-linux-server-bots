@@ -636,8 +636,10 @@ namespace DOL.GS
 			else if (weaponType is eWeaponType.CommanderShield or eWeaponType.GuardianBuckler)
 			{
 				temp.Id_nb = WEAPON_KEYS[(int)weaponType];
-				weaponName = weaponType == eWeaponType.CommanderShield ? "bone square shield" : "bone round buckler";
-				temp.Model = weaponType == eWeaponType.CommanderShield ? 3460 : 1045;
+				// 3460 is a campfire in the client, so the commander's shield never
+				// showed. 3554 is the skull shield the Necromancer's reanimated servant carries.
+				weaponName = weaponType == eWeaponType.CommanderShield ? "bone skull shield" : "bone round buckler";
+				temp.Model = weaponType == eWeaponType.CommanderShield ? 3554 : 1045;
 				temp.Object_Type = (int)eObjectType.Shield;
 				temp.Type_Damage = 1;
 				temp.SPD_ABS = 0;

@@ -81,7 +81,7 @@ namespace DOL.GS
                 Tine tine = new Tine();
                 tine.X = 27211;
                 tine.Y = 54902;
-                tine.Z = 13213;
+                tine.Z = 13007;
                 tine.CurrentRegion = CurrentRegion;
                 tine.Heading = 2157;
                 tine.RespawnInterval = -1;
@@ -92,7 +92,7 @@ namespace DOL.GS
                 Beatha beatha = new Beatha();
                 beatha.X = 27614;
                 beatha.Y = 54866;
-                beatha.Z = 13213;
+                beatha.Z = 13018;
                 beatha.CurrentRegion = CurrentRegion;
                 beatha.Heading = 2038;
                 beatha.RespawnInterval = -1;
@@ -267,21 +267,8 @@ namespace DOL.GS
         {
             return;
         }
-        public override void DealDamage(AttackData ad)
-        {
-            if (ad != null)
-            {
-                foreach (GameNPC xaga in GetNPCsInRadius(8000))
-                {
-                    if (xaga != null)
-                    {
-                        if (xaga.IsAlive && xaga.Brain is XagaBrain)
-                            xaga.Health += ad.Damage*2;//dmg heals xaga
-                    }
-                }
-            }
-            base.DealDamage(ad);
-        }
+        // Offline DAoC: Beatha's damage no longer heals Xaga (it healed her twice the damage
+        // of every Void, thousands per pulse against a raid, and bots could never finish her).
         public override int MaxHealth
         {
             get { return 50000; }
@@ -373,12 +360,19 @@ namespace DOL.AI.Brain
         public static bool path4 = false;
         public override void Think()
         {
-            if(Body.IsAlive)
+            // Offline DAoC: while fighting, Beatha holds her position low over the floor so
+            // melee can reach her; she only circles the room when nothing is engaging her.
+            if (Body.IsAlive && HasAggro)
             {
-                Point3D point1 = new Point3D(27572,54473,13213);
-                Point3D point2 = new Point3D(27183, 54530, 13213);
-                Point3D point3 = new Point3D(27213, 55106, 13213);
-                Point3D point4 = new Point3D(27581, 55079, 13213);
+                if (Body.IsMoving)
+                    Body.StopMoving();
+            }
+            else if(Body.IsAlive)
+            {
+                Point3D point1 = new Point3D(27572, 54473, 12991);
+                Point3D point2 = new Point3D(27183, 54530, 13017);
+                Point3D point3 = new Point3D(27213, 55106, 13052);
+                Point3D point4 = new Point3D(27581, 55079, 13041);
                 if (!Body.IsWithinRadius(point1, 20) && path1 == false)
                 {
                     Body.WalkTo(point1, 250);
@@ -574,12 +568,19 @@ namespace DOL.AI.Brain
         public static bool path4_2 = false;
         public override void Think()
         {
-            if (Body.IsAlive)
+            // Offline DAoC: while fighting, Tine holds her position low over the floor so
+            // melee can reach her; she only circles the room when nothing is engaging her.
+            if (Body.IsAlive && HasAggro)
             {
-                Point3D point1 = new Point3D(27168, 54598, 13213);
-                Point3D point2 = new Point3D(27597, 54579, 13213);
-                Point3D point3 = new Point3D(27606, 55086, 13213);
-                Point3D point4 = new Point3D(27208, 55133, 13213);
+                if (Body.IsMoving)
+                    Body.StopMoving();
+            }
+            else if (Body.IsAlive)
+            {
+                Point3D point1 = new Point3D(27168, 54598, 13023);
+                Point3D point2 = new Point3D(27597, 54579, 13008);
+                Point3D point3 = new Point3D(27606, 55086, 13055);
+                Point3D point4 = new Point3D(27208, 55133, 13067);
                 if (!Body.IsWithinRadius(point1, 20) && path1_2 == false)
                 {
                     Body.WalkTo(point1, 250);

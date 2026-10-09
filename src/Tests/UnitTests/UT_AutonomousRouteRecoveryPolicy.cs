@@ -136,7 +136,7 @@ public sealed class UT_AutonomousRouteRecoveryPolicy
                 1, 1, origin, new(1200, 1100, 900), 30_000), Is.True,
                 "Z differences do not hide an isolated XY navigation component");
             Assert.That(AutonomousRouteRecoveryPolicy.IsSameRepeatedFailurePocket(
-                1, 1, origin, new(1500, 1000, 100), 30_000), Is.False);
+                1, 1, origin, new(2100, 1000, 100), 30_000), Is.False);
             Assert.That(AutonomousRouteRecoveryPolicy.IsSameRepeatedFailurePocket(
                 1, 200, origin, origin, 30_000), Is.False);
             Assert.That(AutonomousRouteRecoveryPolicy.IsSameRepeatedFailurePocket(

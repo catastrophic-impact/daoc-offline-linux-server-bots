@@ -14,6 +14,9 @@ namespace DOL.GS
             public GamePlayer Owner;
             public ECSGameTimer Timer;
             public ushort Region;
+            public int Capacity;
+            public bool Away;
+            public long RefreshUntil, NextReopen;
             public readonly string[] Sent = new string[80];
             public readonly CompanionRaidResurrectionReservations<GameLiving> Resurrection = new();
         }
@@ -39,6 +42,7 @@ namespace DOL.GS
                 session.Timer.Start(500);
             }
             session.Group = group;
+            session.Capacity = capacity;
             Array.Clear(session.Sent);
             Update(session);
             Send(player, 2, (byte)capacity);
@@ -48,6 +52,7 @@ namespace DOL.GS
         public static void Close(GamePlayer player)
         {
             if (player == null || !Sessions.TryGetValue(player, out Session session)) return;
+            CompanionRaidSiege.Close(player);
             session.Timer.Stop();
             session.Resurrection.Clear();
             Sessions.Remove(player);
@@ -57,21 +62,56 @@ namespace DOL.GS
 
         private static int Tick(Session session)
         {
-            if (session.Owner.Group != session.Group || session.Owner.ObjectState != GameObject.eObjectState.Active ||
-                session.Owner.Client?.ClientState != GameClient.eClientState.Playing)
+            GamePlayer owner = session.Owner;
+            var state = owner.Client?.ClientState;
+            if (owner.Group != session.Group || owner.ObjectState == GameObject.eObjectState.Deleted ||
+                state is null or GameClient.eClientState.Disconnected or GameClient.eClientState.Linkdead or
+                    GameClient.eClientState.CharScreen or GameClient.eClientState.NotConnected)
             {
-                Close(session.Owner);
+                Close(owner);
                 return 0;
+            }
+            // Zoning takes the player out of the world for a moment (region change, loading screen).
+            // The raid is still there: wait, then rebuild the window the client cleared on the zone
+            // load (it used to close the session here and leave every slot empty).
+            if (owner.ObjectState != GameObject.eObjectState.Active || state != GameClient.eClientState.Playing)
+            {
+                session.Away = true;
+                return 500;
+            }
+            if (session.Away)
+            {
+                session.Away = false;
+                BeginRefresh(session);
             }
             Update(session);
             return 500;
         }
+
+        /// <summary>Re-open the window and resend every slot for a few seconds (the client may still be loading).</summary>
+        private static void BeginRefresh(Session session)
+        {
+            session.RefreshUntil = GameLoop.GameLoopTime + RefreshMilliseconds;
+            session.NextReopen = 0;
+        }
+
+        public const long RefreshMilliseconds = 8_000;
 
         private static void Update(Session session)
         {
             if (session.Region != session.Owner.CurrentRegionID)
             {
                 session.Region = session.Owner.CurrentRegionID;
+                BeginRefresh(session);
+            }
+            long now = GameLoop.GameLoopTime;
+            if (now < session.RefreshUntil)
+            {
+                if (now >= session.NextReopen && session.Capacity > 0)
+                {
+                    Send(session.Owner, 2, (byte)session.Capacity);
+                    session.NextReopen = now + 2_000;
+                }
                 Array.Clear(session.Sent);
             }
             var members = session.Group.GetMembersInTheGroup();

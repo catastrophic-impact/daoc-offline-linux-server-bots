@@ -38,6 +38,11 @@ public static class AutonomousFrontierTransport
     public const int SliceMilliseconds = 3;
     public const int SliceIntervalMilliseconds = 50;
     public const int BoardingWindowMilliseconds = 30_000;
+    public const long WarbandWaitMilliseconds = 60_000;
+    private const string BlockedSinceKey = "RvrFrontierBlockedSince";
+
+    public static bool PartialDepartureDue(long blockedSince, long now) =>
+        blockedSince > 0 && now - blockedSince >= WarbandWaitMilliseconds;
     public static bool SliceFull(int processed, double elapsedMilliseconds) =>
         processed >= SlicePassengerLimit || elapsedMilliseconds >= SliceMilliseconds;
 
@@ -176,9 +181,17 @@ public static class AutonomousFrontierTransport
             if (priority && !HasDefenderPriority(bot, request?.Passage)) continue;
             if (!Ready(bot,porter,request)) continue;
             var group = BoardingParty(bot, request.Passage);
-            if (group.Any(member => member.CurrentRegionID != request.Passage.Region &&
-                (member.TempProperties.GetProperty<Request>(RequestKey) is not Request memberRequest ||
-                memberRequest.Passage.Region != request.Passage.Region || !Ready(member,porter,memberRequest)))) continue;
+            bool MemberReady(GameBot member) => member.CurrentRegionID == request.Passage.Region ||
+                member.TempProperties.GetProperty<Request>(RequestKey) is Request memberRequest &&
+                memberRequest.Passage.Region == request.Passage.Region && Ready(member, porter, memberRequest);
+            if (!group.All(MemberReady))
+            {
+                long now = GameLoop.GameLoopTime;
+                long since = bot.TempProperties.GetProperty<long>(BlockedSinceKey, 0L);
+                if (since == 0) bot.TempProperties.SetProperty(BlockedSinceKey, now);
+                if (!PartialDepartureDue(since, now)) continue;
+                group = group.Where(MemberReady).ToArray();
+            }
             int departed=0;
             for (int index = 0; index < group.Length; index++)
             {
@@ -200,6 +213,7 @@ public static class AutonomousFrontierTransport
                 departed++;
                 member.Inventory.RemoveItem(ticket);
                 member.TempProperties.RemoveProperty(RequestKey);
+                member.TempProperties.RemoveProperty(BlockedSinceKey);
                 member.ForcePathReplot();
                 AutonomousBotEconomy.MarkInventoryChanged(member);
                 AutonomousStuckWatchdog.MarkProgress(member,eAutonomousProgressKind.Movement);

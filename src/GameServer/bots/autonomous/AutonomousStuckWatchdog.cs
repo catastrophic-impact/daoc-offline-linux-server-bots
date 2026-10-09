@@ -115,8 +115,10 @@ public static class AutonomousStuckWatchdog
             if (zone == null || !nav.IsAvailable || !nav.HasNavmesh(zone)) return false;
             Vector3 position = new(bot.X, bot.Y, bot.Z);
             AutonomousNavigationSurface.TryFloor(nav, zone, position, out position);
-            if (AutonomousRendezvousNavigation.HasLocalExit(nav, zone, position)) return false;
-            reason = "saved position is on an isolated walkable prop without a verified local exit";
+            if (AutonomousZonePockets.Contains(zone.ID, position.X, position.Y, position.Z))
+                reason = "saved position is in a walled-off pocket with no walkable way to real ground";
+            else if (AutonomousRendezvousNavigation.HasLocalExit(nav, zone, position)) return false;
+            else reason = "saved position is on an isolated walkable prop without a verified local exit";
         }
 
         // A handful of audited transition landings persist the correct XY but
@@ -403,7 +405,10 @@ public static class AutonomousStuckWatchdog
         string.Equals(activity, "Formed up at rendezvous", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(activity, "Holding group formation", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(activity, "Staging outside dungeon", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(activity, "Forming inside dungeon entrance", StringComparison.OrdinalIgnoreCase);
+        string.Equals(activity, "Forming inside dungeon entrance", StringComparison.OrdinalIgnoreCase) ||
+        // Siege musters wait at their rally post until the army marches; the muster has its own deadline.
+        // Run 15: 23 of 64 musterers were relocated to a capital mid-muster by the 15-minute clock.
+        activity?.StartsWith("Mustering at ", StringComparison.OrdinalIgnoreCase) == true;
 
     // Changing the displayed route/camp after a failure is not progress. Only
     // a genuinely new timed assignment gets a fresh clock, otherwise repeated
@@ -446,6 +451,8 @@ public static class AutonomousStuckWatchdog
             bot.StopFollowing();
             bot.StopMovingOnPath();
             bot.StopMoving();
+            // A stuck cast must not survive the recovery move (stefanrows fork, Minstrel mez).
+            bot.StopCurrentSpellcast();
             if (bot.Brain is BotBrain brain)
             {
                 brain.ClearAggroList();
@@ -487,7 +494,7 @@ public static class AutonomousStuckWatchdog
             (expedition == null ? "selected a different goal" : "retained expedition membership and returning to the encounter");
         record.LastMeaningfulProgressUtc = now.ToString("O");
         Log.Warn($"{logMarker} bot=\"{ForLog(bot.Name)}\" id={bot.DatabaseID} level={bot.Level} " +
-                 $"realm={bot.Realm} class=\"{ForLog(bot.ClassName)}\" reason=\"{ForLog(reason)}\" " +
+                 $"realm={GlobalConstants.RealmToName(bot.Realm)} class=\"{ForLog(bot.ClassName)}\" reason=\"{ForLog(reason)}\" " +
                  $"goal=\"{ForLog(oldGoal)}\" target=\"{ForLog(oldTarget)}\" activity=\"{ForLog(oldActivity)}\" " +
                  $"destination=\"{ForLog(oldDestination)}\" recovery={record.RecoveryCount} " +
                  $"from={oldRegion}:{oldX},{oldY},{oldZ} to={capital.RegionId}:{capital.X},{capital.Y},{capital.Z}");

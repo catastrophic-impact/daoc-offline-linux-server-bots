@@ -33,23 +33,39 @@ using DOL.GS.Quests;
 namespace DOL.GS.Commands
 {
 	//[CmdAttribute("&task", ePrivLevel.Player, "Ask for a Task from Guards or Merchants", "/task")]
-	[CmdAttribute("&task", ePrivLevel.Player, "Show the actual task", "/task")]
+	// /task on a guard, merchant or crafter asks it for a task (the period behaviour). The Quest Journal's QUEST GUIDE
+	// button also sends /task (owner 2026-10-07: the old TASK button is not needed), so /task with no task-giver
+	// targeted opens the Quest Guide, which shows the current task at the top; /task status is the old snapshot.
+	[CmdAttribute("&task", ePrivLevel.Player, "Ask the targeted guard or merchant for a task, else open the Quest Guide",
+		"/task (target a guard, merchant or crafter)", "/task status", "/task abort")]
 	public class TaskCommandHandler : AbstractCommandHandler, ICommandHandler
 	{
+		private static readonly DOL.Logging.Logger Log = DOL.Logging.LoggerManager.Create(typeof(TaskCommandHandler));
+		private static int _logged;
+
 		public void OnCommand(GameClient client, string[] args)
 		{
+			// The first calls are logged: the QUEST GUIDE button's TASK event shows up here (owner 2026-10-07: the
+			// button did nothing while typing /task worked).
+			if (System.Threading.Interlocked.Increment(ref _logged) <= 20)
+				Log.Info($"QUEST_GUIDE_TASK player={client.Player?.Name} args=\"{string.Join(" ", args)}\"");
 			if (IsSpammingCommand(client.Player, "task"))
 				return;
 
-			if (args.Length > 1)
+			if (args.Length < 2 || (args[1] != "abort" && args[1] != "status"))
 			{
-				if (args[1] == "abort")
-				{
-					if (client.Player.GameTask != null && client.Player.GameTask.TaskActive)
-						client.Player.GameTask.ExpireTask();
-				}
+				GamePlayer asker = client.Player;
+				if (asker.TargetObject is GameLiving giver && giver != asker && TryGiveTask(asker, giver))
+					return;
+				QuestGuide.ShowNext(asker);
+				return;
 			}
-			else
+			if (args[1] == "abort")
+			{
+				if (client.Player.GameTask != null && client.Player.GameTask.TaskActive)
+					client.Player.GameTask.ExpireTask();
+			}
+			else if (args[1] == "status")
 			{
 				GamePlayer player = client.Player;
 				//TaskCommand(client.Player);
@@ -77,6 +93,21 @@ namespace DOL.GS.Commands
 					player.Out.SendMessage("You have currently no pending task", eChatType.CT_System, eChatLoc.CL_SystemWindow);
 				}
 			}
+		}
+
+		/// <summary>A task from the targeted NPC, when it is close enough and has one for this player (same as
+		/// whispering "task" to it).</summary>
+		private static bool TryGiveTask(GamePlayer player, GameLiving giver)
+		{
+			if (!player.IsWithinRadius(giver, WorldMgr.WHISPER_DISTANCE))
+				return false;
+			if (KillTask.CheckAvailability(player, giver))
+				return KillTask.BuildTask(player, giver);
+			if (MoneyTask.CheckAvailability(player, giver))
+				return MoneyTask.BuildTask(player, giver);
+			if (CraftTask.CheckAvailability(player, giver))
+				return CraftTask.BuildTask(player, giver);
+			return false;
 		}
 
 		/// <summary>

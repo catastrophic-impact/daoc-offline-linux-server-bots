@@ -158,7 +158,7 @@ namespace DOL.GS
             {
                 string message = LanguageMgr.GetTranslation(ServerProperties.Properties.SERV_LANGUAGE, "GameRelicPad.MountRelic.Stored", relic.CurrentCarrier.Name, GlobalConstants.RealmToName(relic.CurrentCarrier.Realm), relic.Name, Name);
 
-                foreach (GamePlayer otherPlayer in ClientService.Instance.GetPlayers())
+                foreach (GamePlayer otherPlayer in GameWideAnnouncements.Enabled(AnnouncementKind.RvrBattleground) ? ClientService.Instance.GetPlayers() : [])
                 {
                     otherPlayer.Out.SendMessage(LanguageMgr.GetTranslation(otherPlayer.Client.Account.Language, "GameRelicPad.MountRelic.Captured", GlobalConstants.RealmToName(relic.CurrentCarrier.Realm), relic.Name), eChatType.CT_ScreenCenterSmaller, eChatLoc.CL_SystemWindow);
                     otherPlayer.Out.SendMessage($"{message}\n{message}\n{message}", eChatType.CT_Important, eChatLoc.CL_SystemWindow);
@@ -182,7 +182,7 @@ namespace DOL.GS
             {
                 string message = $"The {relic.Name} has been returned to {Name}.";
 
-                foreach (GamePlayer otherPlayer in ClientService.Instance.GetPlayers())
+                foreach (GamePlayer otherPlayer in GameWideAnnouncements.Enabled(AnnouncementKind.RvrBattleground) ? ClientService.Instance.GetPlayers() : [])
                     otherPlayer.Out.SendMessage($"{message}\n{message}\n{message}", eChatType.CT_Important, eChatLoc.CL_SystemWindow);
             }
 
@@ -211,7 +211,7 @@ namespace DOL.GS
             {
                 string message = LanguageMgr.GetTranslation(ServerProperties.Properties.SERV_LANGUAGE, "GameRelicPad.RemoveRelic.Removed", relic.CurrentCarrier.Name, GlobalConstants.RealmToName((eRealm)relic.CurrentCarrier.Realm), relic.Name, Name);
 
-                foreach (GamePlayer otherPlayer in ClientService.Instance.GetPlayers())
+                foreach (GamePlayer otherPlayer in GameWideAnnouncements.Enabled(AnnouncementKind.RvrBattleground) ? ClientService.Instance.GetPlayers() : [])
                     otherPlayer.Out.SendMessage($"{message}\n{message}\n{message}", eChatType.CT_Important, eChatLoc.CL_SystemWindow);
 
                 NewsMgr.CreateNews(message, relic.CurrentCarrier.Realm, eNewsType.RvRGlobal, false);

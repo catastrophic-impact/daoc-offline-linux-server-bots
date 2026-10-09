@@ -8,10 +8,10 @@ namespace DOL.UnitTests;
 public class UT_BountyRewardFormula
 {
     [Test]
-    public void KillRequirementGrowsFromFiveToFiftyBeforeEpicLevel()
+    public void KillRequirementClimbsFromFiveToTwentyBeforeEpicLevel()
     {
         Assert.That(BountyQuest.RequiredKillsForLevel(1), Is.EqualTo(5));
-        Assert.That(BountyQuest.RequiredKillsForLevel(49), Is.EqualTo(50));
+        Assert.That(BountyQuest.RequiredKillsForLevel(49), Is.EqualTo(20));
         Assert.That(BountyQuest.RequiredKillsForLevel(50), Is.EqualTo(1));
         for (int level = 2; level < 50; level++)
             Assert.That(BountyQuest.RequiredKillsForLevel(level),

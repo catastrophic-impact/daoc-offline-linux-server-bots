@@ -350,7 +350,9 @@ namespace DOL.GS
                 Span<float> buffer = rentedBuffer.AsSpan(0, MAX_POLY * 3);
                 Span<EDtPolyFlags> flags = rentedFlags.AsSpan(0, MAX_POLY);
 
+                long profiled = NavQueryProfile.Start();
                 EDtStatus status = PathStraight(query, startFloats, endFloats, _defaultHalfExtents, filters, options, out int numNodes, buffer, flags);
+                NavQueryProfile.Stop(NavQueryProfile.Kind.PathStraight, profiled);
 
                 if ((status & EDtStatus.DT_SUCCESS) == 0)
                     return new(PathfindingStatus.NoPathFound, 0);
@@ -358,11 +360,17 @@ namespace DOL.GS
                 if (destination.Length < numNodes)
                     return new(PathfindingStatus.BufferTooSmall, numNodes);
 
+                // ALL_CROSSINGS emits one node per polygon edge crossed. Where several
+                // polygons share a vertex (a four-tile corner on the Iarnwood slope has
+                // five) those crossings coincide, giving the same point two or three
+                // times. A zero-length step has no direction, so line-of-sight checks
+                // toward it fail and actors stalled on the corner. Merge them.
                 for (int i = 0; i < numNodes; i++)
                     destination[i] = new(new(buffer[i * 3 + 0] * INV_FACTOR, buffer[i * 3 + 2] * INV_FACTOR, buffer[i * 3 + 1] * INV_FACTOR), flags[i]);
+                int kept = MergeCoincidentNodes(destination, numNodes);
 
                 PathfindingStatus pathfindingStatus = (status & EDtStatus.DT_PARTIAL_RESULT) != 0 ? PathfindingStatus.PartialPathFound : PathfindingStatus.PathFound;
-                return new(pathfindingStatus, numNodes);
+                return new(pathfindingStatus, kept);
             }
             finally
             {
@@ -402,7 +410,9 @@ namespace DOL.GS
             FillRecastFloats(end, endFloats);
 
             Span<float> outVec = stackalloc float[3];
+            long profiled = NavQueryProfile.Start();
             EDtStatus status = MoveAlongSurface(query, startFloats, endFloats, _defaultHalfExtents, filters, outVec);
+            NavQueryProfile.Stop(NavQueryProfile.Kind.OtherQuery, profiled);
 
             return (status & EDtStatus.DT_SUCCESS) == 0 ? null : new(outVec[0] * INV_FACTOR, outVec[2] * INV_FACTOR, outVec[1] * INV_FACTOR);
         }
@@ -416,7 +426,9 @@ namespace DOL.GS
             FillRecastFloats(position, center);
 
             Span<float> outVec = stackalloc float[3];
+            long profiled = NavQueryProfile.Start();
             EDtStatus status = FindRandomPointAroundCircle(query, center, radius * CONVERSION_FACTOR, _defaultHalfExtents, filters, outVec);
+            NavQueryProfile.Stop(NavQueryProfile.Kind.OtherQuery, profiled);
 
             return (status & EDtStatus.DT_SUCCESS) == 0 ? null : new(outVec[0] * INV_FACTOR, outVec[2] * INV_FACTOR, outVec[1] * INV_FACTOR);
         }
@@ -430,7 +442,9 @@ namespace DOL.GS
             FillRecastFloats(position, center);
 
             Span<float> outVec = stackalloc float[3];
+            long profiled = NavQueryProfile.Start();
             EDtStatus status = FindClosestPoint(query, center, _defaultHalfExtents, filters, outVec);
+            NavQueryProfile.Stop(NavQueryProfile.Kind.ClosestPoint, profiled);
 
             return (status & EDtStatus.DT_SUCCESS) == 0 ? null : new(outVec[0] * INV_FACTOR, outVec[2] * INV_FACTOR, outVec[1] * INV_FACTOR);
         }
@@ -447,7 +461,9 @@ namespace DOL.GS
             FillRecastFloats(new(xRange, yRange, zRange), polyPickEx);
 
             Span<float> outVec = stackalloc float[3];
+            long profiled = NavQueryProfile.Start();
             EDtStatus status = FindClosestPoint(query, center, polyPickEx, filters, outVec);
+            NavQueryProfile.Stop(NavQueryProfile.Kind.ClosestPoint, profiled);
 
             return (status & EDtStatus.DT_SUCCESS) == 0 ? null : new(outVec[0] * INV_FACTOR, outVec[2] * INV_FACTOR, outVec[1] * INV_FACTOR);
         }
@@ -533,8 +549,45 @@ namespace DOL.GS
 
             Span<float> outVec = stackalloc float[3];
             EDtStatus status = HasLineOfSight(query, startFloats, endFloats, _defaultHalfExtents, filters, out bool hasLos, outVec);
+            if ((status & EDtStatus.DT_SUCCESS) != 0 && hasLos)
+                return true;
+
+            // A ray starting exactly on a vertex shared by several polygons can start
+            // in a neighbour whose edge is a wall, and report no sight to a point that
+            // is plainly visible (seen at the Iarnwood four-tile corner). Retry once from
+            // 2 units along the same ray; the ray itself is unchanged.
+            Vector3 direction = target - position;
+            if (direction.LengthSquared() <= VERTEX_RETRY_MIN_DISTANCE * VERTEX_RETRY_MIN_DISTANCE)
+                return false;
+            FillRecastFloats(position + Vector3.Normalize(direction) * VERTEX_RETRY_OFFSET, startFloats);
+            status = HasLineOfSight(query, startFloats, endFloats, _defaultHalfExtents, filters, out hasLos, outVec);
             return (status & EDtStatus.DT_SUCCESS) != 0 && hasLos;
         }
+
+        public const float DUPLICATE_NODE_DISTANCE = 1f;
+
+        /// <summary>
+        /// Merges consecutive nodes less than 1 unit apart into the first (flags combined, so a
+        /// door crossing is kept). The final node is always kept. Returns the new count.
+        /// </summary>
+        public static int MergeCoincidentNodes(Span<WrappedPathfindingNode> nodes, int count)
+        {
+            int kept = 0;
+            for (int i = 0; i < count; i++)
+            {
+                WrappedPathfindingNode node = nodes[i];
+                if (kept > 0 && i < count - 1 &&
+                    Vector3.DistanceSquared(nodes[kept - 1].Position, node.Position) < DUPLICATE_NODE_DISTANCE * DUPLICATE_NODE_DISTANCE)
+                {
+                    nodes[kept - 1] = new(nodes[kept - 1].Position, nodes[kept - 1].Flags | node.Flags);
+                    continue;
+                }
+                nodes[kept++] = node;
+            }
+            return kept;
+        }
+        public const float VERTEX_RETRY_OFFSET = 2f;
+        public const float VERTEX_RETRY_MIN_DISTANCE = 4f;
 
         private static Vector3? GetNearestPoly(Zone zone, Vector3 point, EDtPolyFlags[] filters, out ulong polyRef)
         {

@@ -301,6 +301,23 @@ namespace DOL.UnitTests
             player.Mana = 99; Assert.That(PlayerCompanionGrind.NeedsRecovery(player), Is.True);
         }
 
+        [TestCase(eCharacterClass.Paladin, true)] [TestCase(eCharacterClass.Bard, true)]
+        [TestCase(eCharacterClass.Minstrel, true)] [TestCase(eCharacterClass.Skald, true)]
+        [TestCase(eCharacterClass.Warden, true)] [TestCase(eCharacterClass.Armsman, false)]
+        [TestCase(eCharacterClass.Cleric, false)]
+        public void OnlyChantingAndSingingClassesGetTheUpkeepTolerance(eCharacterClass characterClass, bool expected) =>
+            Assert.That(PlayerCompanionGrind.IsSongUpkeepClass(characterClass), Is.EqualTo(expected));
+
+        [Test] public void SongUpkeepStillNeedsFullHealthButOnlyAFloorOfPowerAndEndurance()
+        {
+            Assert.That(PlayerCompanionGrind.ReadyWithSongUpkeep(100, 100, 80, 100, 76, 100), Is.True);
+            Assert.That(PlayerCompanionGrind.ReadyWithSongUpkeep(100, 100, 75, 100, 75, 100), Is.True);
+            Assert.That(PlayerCompanionGrind.ReadyWithSongUpkeep(99, 100, 100, 100, 100, 100), Is.False, "health must be full");
+            Assert.That(PlayerCompanionGrind.ReadyWithSongUpkeep(100, 100, 74, 100, 100, 100), Is.False);
+            Assert.That(PlayerCompanionGrind.ReadyWithSongUpkeep(100, 100, 100, 100, 50, 100), Is.False);
+            Assert.That(PlayerCompanionGrind.ReadyWithSongUpkeep(100, 100, 0, 0, 90, 100), Is.True, "no power pool");
+        }
+
         [TestCase(true)] [TestCase(false)]
         public void StopCancelsOnlyUnengagedPullsNotActualBattles(bool fighting)
         {

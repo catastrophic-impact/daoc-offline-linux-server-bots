@@ -999,7 +999,8 @@ namespace DOL.UnitTests
         [Test]
         public void WardensDoNotAlternateAnActiveBladeturnAndPaladinsDoNotToggleActiveChant()
         {
-            foreach (Type type in new[] { typeof(ClassWarden), typeof(ClassPaladin) })
+            // A solo Paladin now holds the damage chant in a fight (see SoloPaladinSwitchesOnceToTheDamageChant).
+            foreach (Type type in new[] { typeof(ClassWarden) })
             {
                 Bot bot = NewBot(type); bot.CaptureCasts = true; bot.Attacking = true;
                 Spell anchor = Song(type == typeof(ClassWarden) ? "Bladeturn" : "EnduranceRegenBuff");
@@ -1011,6 +1012,20 @@ namespace DOL.UnitTests
                 Assert.That(bot.LastRequested, Is.Null, "No secondary without a safe native child window; never toggle anchor");
                 Assert.That(source.IsEnding, Is.False);
             }
+        }
+
+        [Test]
+        public void SoloPaladinSwitchesOnceToTheDamageChantAndThenHoldsIt()
+        {
+            Bot bot = NewBot(typeof(ClassPaladin)); bot.CaptureCasts = true; bot.Attacking = true;
+            Spell endurance = Song("EnduranceRegenBuff");
+            Spell damage = Song("DamageAdd", id: 99972);
+            bot.InstantMiscSpells = new List<Spell> { endurance, damage };
+            var source = new ECSPulseEffect(new(bot, 0, 1, new SpellHandler(bot, endurance, Line)), endurance.Frequency);
+            source.Start();
+            bot.effectListComponent.BeginTick();
+            typeof(BotBrain).GetMethod("TryMaintainTankChant", Hidden).Invoke(bot.Brain, null);
+            Assert.That(bot.LastRequested?.ID, Is.EqualTo(99972), "a solo Paladin in a fight holds the damage chant");
         }
 
         [TestCase(typeof(ClassSkald), "HealthRegenBuff")]

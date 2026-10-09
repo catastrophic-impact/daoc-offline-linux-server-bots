@@ -116,12 +116,24 @@ namespace DOL.GS
 
         public static bool CanUseEntrance(DbZonePoint edge, ushort goalRegion, int goalX, int goalY) =>
             goalRegion == AutonomousDarknessFallsPolicy.RegionId && edge?.TargetRegion == goalRegion
-                ? AutonomousDarknessFallsNavigation.HasCertifiedEntrance(edge, goalX, goalY)
+                // Ordinary goals need a certified camp entry; a running Darkness Falls raid's
+                // destinations (Legion, the High Lords...) use the realm's own home entrances.
+                ? AutonomousDarknessFallsNavigation.HasCertifiedEntrance(edge, goalX, goalY) ||
+                  AutonomousRealmRaid.IsActiveRaidDestination(goalRegion, goalX, goalY) &&
+                  AutonomousDarknessFallsNavigation.IsHomeEntrance(edge)
                 :
             edge.TargetRegion != goalRegion || !Data.Value.Entrances.TryGetValue((goalRegion, goalX, goalY), out var entrances) ||
             entrances.Contains((edge.TargetX, edge.TargetY, edge.TargetZ)) ||
-            entrances.Any(entry => MatchesEntrance(new(edge.TargetX, edge.TargetY, edge.TargetZ),
-                new(entry.X, entry.Y, entry.Z)));
+            MatchesAnyEntrance(entrances, new(edge.TargetX, edge.TargetY, edge.TargetZ));
+
+        // A plain loop: called for every zone point on every region route (closure allocations
+        // per call showed in the run 8 allocation trace).
+        private static bool MatchesAnyEntrance(HashSet<(int X, int Y, int Z)> entrances, Vector3 authored)
+        {
+            foreach (var entry in entrances)
+                if (MatchesEntrance(authored, new(entry.X, entry.Y, entry.Z))) return true;
+            return false;
+        }
     }
 
     public sealed partial class AutonomousWorldBotController

@@ -207,13 +207,11 @@ namespace DOL.AI.Brain
 
 		private int PrepareDD(ECSGameTimer timer)
         {
-			if (DD_Enemys.Count > 0)
+			// Iterate a copy: Think() adds and removes targets on its own tick.
+			foreach (GameLiving targets in DD_Enemys.ToArray())
 			{
-				foreach (GameLiving targets in DD_Enemys)
-				{
-					if (targets.IsAlive && targets != null)
-						DamageTarget(targets, Body);
-				}
+				if (targets != null && targets.IsAlive)
+					DamageTarget(targets, Body);
 			}
 			new ECSGameTimer(Body, new ECSGameTimer.ECSTimerCallback(ResetDD), 2000);
 			return 0;
@@ -240,14 +238,11 @@ namespace DOL.AI.Brain
 				p.Out.SendCombatAnimation(caster, target, 0, 0, 0, 0, 0x14, target.HealthPercent);
 			}
 
-			if(target is NecromancerPet pet)
-			{
-				if (pet != null && pet.Owner.IsAlive && pet.Owner != null)
-				{
-					GamePlayer PetOwner = pet.Owner as GamePlayer;
-					PetOwner.OnAttackedByEnemy(ad);
-				}
-			}
+			// A gamebot Necromancer's pet has a bot owner, not a player. Casting that owner
+			// to GamePlayer threw, and the timer service then removed Pilus'Fury from the
+			// world until Amminus Pilus respawned. Alert whichever owner it is.
+			if (target is NecromancerPet { Owner: { IsAlive: true } petOwner })
+				petOwner.OnAttackedByEnemy(ad);
 			target.OnAttackedByEnemy(ad);
 			caster.DealDamage(ad);
 

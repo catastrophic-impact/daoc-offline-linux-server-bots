@@ -28,6 +28,8 @@ public static class SluaghbinderEpicQuestState
         _ => false,
     };
 
+    public static bool IsRewardSpell(int spellId) => spellId is >= 59080 and <= 59084;
+
     public static void NotifyReward(GamePlayer player, int spellId)
     {
         if (player == null)
@@ -40,6 +42,33 @@ public static class SluaghbinderEpicQuestState
         player.Out.SendMessage("Your Epic Spells page has been updated with a new skeletal service.",
             eChatType.CT_ScreenCenter, eChatLoc.CL_SystemWindow);
     }
+}
+
+/// <summary>
+/// The Epic Spells page follows the player's level like any career line, which
+/// listed every rank up to that level (a level 30 finishing the level 10 quest
+/// saw the 10, 20 and 30 raises). Only ranks whose quest is finished are shown;
+/// the summon itself was already gated by the same check.
+/// </summary>
+public sealed class SluaghbinderEpicSpellsSpecialization : CareerSpecialization
+{
+    public SluaghbinderEpicSpellsSpecialization(string keyname, string displayname, ushort icon, int id)
+        : base(keyname, displayname, icon, id) { }
+
+    protected override IDictionary<SpellLine, List<Skill>> GetLinesSpellsForLiving(GameLiving living, int level)
+    {
+        IDictionary<SpellLine, List<Skill>> lines = base.GetLinesSpellsForLiving(living, level);
+        if (living is not GamePlayer player)
+            return lines;
+
+        foreach (SpellLine line in lines.Keys.ToList())
+            lines[line] = EarnedOnly(lines[line], spellId => SluaghbinderEpicQuestState.HasReward(player, spellId));
+        return lines;
+    }
+
+    public static List<Skill> EarnedOnly(IEnumerable<Skill> skills, Func<int, bool> earned) =>
+        skills.Where(skill => skill is not Spell spell ||
+            !SluaghbinderEpicQuestState.IsRewardSpell(spell.ID) || earned(spell.ID)).ToList();
 }
 
 /// <summary>
@@ -92,6 +121,28 @@ public abstract class SluaghbinderEpicQuest : BaseQuest
         base.OnQuestAssigned(player);
         SluaghbinderEpicQuestRuntime.StartQuest(GetType());
         player.Out.SendMessage(Definition.Clue, eChatType.CT_Important, eChatLoc.CL_SystemWindow);
+        ShowMarker();
+    }
+
+    /// <summary>Red map dot: the target while hunting, Muirenn once it is slain.</summary>
+    public void ShowMarker()
+    {
+        if (m_questPlayer == null)
+            return;
+        GameNPC giver = SluaghbinderEpicQuestRuntime.QuestGiver;
+        if (Step == 1)
+            SluaghbinderQuestMapMarkers.Set(m_questPlayer, (ushort)Definition.Region, Definition.X, Definition.Y, Definition.Z);
+        else if (Step == 2 && giver != null)
+            SluaghbinderQuestMapMarkers.Set(m_questPlayer, giver.CurrentRegionID, giver.X, giver.Y, giver.Z);
+        else
+            SluaghbinderQuestMapMarkers.Clear(m_questPlayer);
+    }
+
+    public override void AbortQuest()
+    {
+        GamePlayer player = m_questPlayer;
+        base.AbortQuest();
+        SluaghbinderQuestMapMarkers.Clear(player);
     }
 
     public override void Notify(DOLEvent e, object sender, EventArgs args)
@@ -104,7 +155,10 @@ public abstract class SluaghbinderEpicQuest : BaseQuest
             return;
 
         base.FinishQuest();
+        SluaghbinderQuestMapMarkers.Clear(m_questPlayer);
         SluaghbinderEpicQuestState.NotifyReward(m_questPlayer, Definition.RewardSpellId);
+        if (this is SluaghbinderEpic50)
+            SluaghbinderEpicArmor.Grant(m_questPlayer, SluaghbinderEpicQuestRuntime.QuestGiver, reclaim: false);
         SluaghbinderEpicQuestRuntime.UpdateTrainerIndicator(m_questPlayer);
     }
 }
@@ -197,22 +251,24 @@ public static class SluaghbinderEpicQuestRuntime
         [typeof(SluaghbinderEpic20)] = new()
         {
             QuestType = typeof(SluaghbinderEpic20), Title = "Bones Beneath the Cairn", TargetName = "Mirebound Ossuary",
-            Clue = "The rot has seeped deeper. Descend into Muire Tomb and seek Frang himself. The mire-bound ossuary has taken root directly beside the keeper, where the old stones meet his watch.",
-            Region = 221, X = 32213, Y = 32765, Z = 15040, QuestLevel = 20, Level = 25, Model = 2213, RewardSpellId = 59081,
+            Clue = "The rot has seeped deeper. Descend into Muire Tomb and seek Frang himself. The mire-bound ossuary has taken root in the keeper's hall, a few paces from his watch, where the old stones meet the corpse devourers.",
+            // A few paces west of Frang on the same floor (navmesh-checked), not
+            // on top of him.
+            Region = 221, X = 32030, Y = 32765, Z = 15040, QuestLevel = 20, Level = 25, Model = 2213, RewardSpellId = 59081,
         },
         [typeof(SluaghbinderEpic30)] = new()
         {
             QuestType = typeof(SluaghbinderEpic30), Title = "The Fomor Gravewarden", TargetName = "Fomor Gravewarden",
-            Clue = "A Fomor warden now keeps the stolen dead. Travel into the Vale of Balor and follow the lower Fomorian road, where the scattered sentries guard the warm green stone. There, a gravewarden has broken from the living patrol.",
+            Clue = "A Fomor warden now keeps the stolen dead. Travel into Caillte Garran and follow the lower Fomorian road, where the scattered sentries guard the warm green stone. There, a gravewarden has broken from the living patrol.",
             Region = 181, X = 350500, Y = 388800, Z = 5750, QuestLevel = 30, Level = 35, Model = 826, RewardSpellId = 59082,
         },
         [typeof(SluaghbinderEpic40)] = new()
         {
             QuestType = typeof(SluaghbinderEpic40), Title = "Ink of the Grave", TargetName = "Mirewood Death-Scribe",
             Clue = "The names of the dead are being written again. Enter the Cursed Forest and follow the blackwood trail to the black wraiths' standing stones; beneath the blue-tinged boughs, a death-scribe keeps the unquiet ledger.",
-            // Move the scribe north off the blackwood trunk while keeping it
-            // beside the standing stones and the black-wraith route.
-            Region = 200, X = 479700, Y = 503630, Z = 5760, QuestLevel = 40, Level = 45, Model = 440, RewardSpellId = 59083,
+            // In the middle of the three black wraiths, on open ground with no
+            // tree overhead (navmesh-checked); the old spot was inside a trunk.
+            Region = 200, X = 479443, Y = 503717, Z = 5755, QuestLevel = 40, Level = 45, Model = 440, RewardSpellId = 59083,
         },
         [typeof(SluaghbinderEpic50)] = new()
         {
@@ -508,6 +564,7 @@ public static class SluaghbinderEpicQuestRuntime
             if (player.IsDoingQuest(questType) is SluaghbinderEpicQuest quest && quest.Step == 1)
             {
                 quest.Step = 2;
+                quest.ShowMarker();
                 player.Out.SendMessage($"{target.Name} is defeated. Return to Muirenn in Tir na Nog for your reward.",
                     eChatType.CT_ScreenCenter, eChatLoc.CL_SystemWindow);
             }
@@ -548,8 +605,15 @@ public static class SluaghbinderEpicQuestRuntime
     [ScriptLoadedEvent]
     public static void ScriptLoaded(DOLEvent e, object sender, EventArgs args)
     {
+        // The Dubh Sluagh set's templates are defined in code and refreshed every start,
+        // even with quests disabled, so worn pieces always resolve to a template.
+        SluaghbinderEpicArmor.EnsureTemplates();
+
         if (!ServerProperties.Properties.LOAD_QUESTS)
             return;
+
+        GameEventMgr.AddHandler(GamePlayerEvent.GameEntered, PlayerEntered);
+        GameEventMgr.AddHandler(GamePlayerEvent.Quit, PlayerQuit);
 
         GameNPC[] npcs = WorldMgr.GetNPCsByName("Muirenn", eRealm.Hibernia);
         Muirenn = npcs.FirstOrDefault(npc => npc.CurrentRegionID == 201) ?? npcs.FirstOrDefault();
@@ -572,9 +636,13 @@ public static class SluaghbinderEpicQuestRuntime
 
     private static GameNPC Muirenn;
 
+    public static GameNPC QuestGiver => Muirenn;
+
     [ScriptUnloadedEvent]
     public static void ScriptUnloaded(DOLEvent e, object sender, EventArgs args)
     {
+        GameEventMgr.RemoveHandler(GamePlayerEvent.GameEntered, PlayerEntered);
+        GameEventMgr.RemoveHandler(GamePlayerEvent.Quit, PlayerQuit);
         if (Muirenn == null)
             return;
 
@@ -607,6 +675,10 @@ public static class SluaghbinderEpicQuestRuntime
                 SluaghbinderEpicQuestDefinition definition = Definitions[questType];
                 Muirenn.SayTo(player, $"The next thread is ready: {definition.Title}. The dead must be faced before the service can be [begun].");
             }
+            else if (player.HasFinishedQuest(typeof(SluaghbinderEpic50)) > 0)
+            {
+                Muirenn.SayTo(player, "The host has claimed you. If any piece of your Dubh Sluagh panoply is lost, I can [reclaim the set] for you.");
+            }
             else
             {
                 Muirenn.SayTo(player, "The six paths are quiet. Return when the next threshold has opened, or when your current hunt is complete.");
@@ -619,12 +691,29 @@ public static class SluaghbinderEpicQuestRuntime
             {
                 active.FinishQuest();
             }
+            else if ((text == "reclaim the set" || text == "reclaim") && player.HasFinishedQuest(typeof(SluaghbinderEpic50)) > 0)
+            {
+                SluaghbinderEpicArmor.Grant(player, Muirenn, reclaim: true);
+            }
             else if (active == null && questType != null && (text == "begun" || text == "begin" || text == "start"))
             {
                 QuestMgr.ProposeQuestToPlayer(questType,
                     $"Will you undertake {Definitions[questType].Title}?", player, Muirenn);
             }
         }
+    }
+
+    private static void PlayerEntered(DOLEvent e, object sender, EventArgs args)
+    {
+        if (sender is GamePlayer player && GetNextQuest(player) is Type questType &&
+            player.IsDoingQuest(questType) is SluaghbinderEpicQuest quest)
+            quest.ShowMarker();
+    }
+
+    private static void PlayerQuit(DOLEvent e, object sender, EventArgs args)
+    {
+        if (sender is GamePlayer player)
+            SluaghbinderQuestMapMarkers.Clear(player);
     }
 
     private static void AcceptQuest(DOLEvent e, object sender, EventArgs args)

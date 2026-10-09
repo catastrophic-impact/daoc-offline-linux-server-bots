@@ -30,6 +30,10 @@ namespace DOL.GS
             });
         }
 
+        /// <summary>The one chant a solo Paladin holds: damage in a fight, the combat heal when hurt, endurance otherwise.</summary>
+        public static eSpellType SoloPaladinAnchor(bool fighting, int healthPercent) =>
+            !fighting ? eSpellType.EnduranceRegenBuff : healthPercent < 70 ? eSpellType.CombatHeal : eSpellType.DamageAdd;
+
         public static bool IsMobileSong(GameLiving living, Spell spell)
         {
             return IsManagedSong(living, spell) &&

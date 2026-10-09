@@ -19,7 +19,7 @@ namespace DOL.AI.Brain
         public SluaghbinderPetBrain(GameLiving owner) : base(owner) { }
 
         private bool IsZombiePriest =>
-            Body?.NPCTemplate?.Name?.Equals("zombie priest", System.StringComparison.OrdinalIgnoreCase) == true;
+            DOL.GS.SluaghbinderPet.IsHealerRole(Body?.NPCTemplate?.Name);
 
         /// <summary>
         /// The priest remains a normal controlled melee/spell pet, but checks

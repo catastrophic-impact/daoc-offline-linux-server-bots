@@ -89,7 +89,7 @@ namespace DOL.GS
 			if (Owner is GameBot && !BotSiegeRuntime.CanDamage(this, TargetObject as GameLiving)) return;
 			base.DoDamage();//anim mut be called after damage
 			GameLiving target = (TargetObject as GameLiving);
-			if (target == null) return;
+			if (target == null || target is Keeps.GuardLord) return; // siege never kills a keep lord
 
 			int damageAmount = CalcDamageToTarget(target) + Util.Random(50);
 

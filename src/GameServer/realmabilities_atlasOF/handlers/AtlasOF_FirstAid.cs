@@ -38,7 +38,7 @@ namespace DOL.GS.RealmAbilities
 			// 300hp at Lv50 per ability level as per 1.65
 			// scaled to player level
 			GamePlayer player = living as GamePlayer;
-			var scaleLevel = (double)player.Level / 50;
+			var scaleLevel = (double)living.Level / 50; // living: gamebots use First Aid too
 			healAmount = (int)(currentLevelAbility * 300 * scaleLevel);
 			int healed = living.ChangeHealth(living, eHealthChangeType.Spell, healAmount);
 

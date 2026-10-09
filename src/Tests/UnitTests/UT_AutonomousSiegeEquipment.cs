@@ -66,7 +66,7 @@ namespace DOL.UnitTests
             Assert.That(AutonomousWorldBotController.SiegeSupplyBudget(playerResponse), Is.EqualTo(budget));
         }
 
-        [TestCase(BotSiegeKind.Ram, 400)]
+        [TestCase(BotSiegeKind.Ram, 500)] // heavy ram for bot crews
         [TestCase(BotSiegeKind.Catapult, 3000)]
         [TestCase(BotSiegeKind.Trebuchet, 5000)]
         [TestCase(BotSiegeKind.Ballista, 4000)]
@@ -76,14 +76,15 @@ namespace DOL.UnitTests
             Assert.That(BotSiegeRuntime.Kind(weapon),Is.EqualTo(kind));
             Assert.That(weapon is GameSiegeRam ? weapon.attackComponent.AttackRange : weapon.MaxAttackRange,Is.EqualTo(maximum));
         }
-        [TestCase(199,false)] [TestCase(200,true)] [TestCase(310,true)] [TestCase(375,true)] [TestCase(401,false)] [TestCase(500,false)]
-        public void RamPlacementCannotExceedTheActualLightRamReach(int distance,bool valid)
+        // Bot crews use the heavy ram (reach 500; bots fire within 475 and no closer than 200).
+        [TestCase(199,false)] [TestCase(200,true)] [TestCase(310,true)] [TestCase(375,true)] [TestCase(475,true)] [TestCase(476,false)] [TestCase(500,false)]
+        public void RamPlacementCannotExceedTheActualHeavyRamReach(int distance,bool valid)
         {
             var weapon=AutonomousWorldBotController.CreateSiegeWeapon(BotSiegeKind.Ram);
             var target=new Target { X=distance };
             Assert.That(AutonomousWorldBotController.InSiegeRange(weapon,target),Is.EqualTo(valid));
         }
-        [TestCase(0,0)] [TestCase(7,0)] [TestCase(8,2)] [TestCase(23,2)] [TestCase(24,4)] [TestCase(63,4)] [TestCase(64,6)] [TestCase(300,6)]
+        [TestCase(0,0)] [TestCase(3,0)] [TestCase(4,1)] [TestCase(7,1)] [TestCase(8,3)] [TestCase(23,3)] [TestCase(24,5)] [TestCase(63,5)] [TestCase(64,6)] [TestCase(300,6)]
         public void EquipmentJobsAreBoundedByArrivedTroops(int present,int slots) => Assert.That(AutonomousSiegeJobs.Slots(present),Is.EqualTo(slots));
 
         [TestCase(eCharacterClass.Armsman,true)] [TestCase(eCharacterClass.Warrior,true)] [TestCase(eCharacterClass.Hero,true)]

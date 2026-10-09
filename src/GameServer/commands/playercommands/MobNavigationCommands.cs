@@ -860,7 +860,7 @@ public sealed class MobsCommandHandler : AbstractCommandHandler, ICommandHandler
             return;
         }
         IReadOnlyList<(string Name, byte Level)> entries = PlayerMobNavigator.GetAvailableMonsterNames(player, level);
-        DisplayMessage(client, $"{entries.Count} accessible level {level} monster names in {player.Realm} territory, dungeons and shared RvR areas.");
+        DisplayMessage(client, $"{entries.Count} accessible level {level} monster names in {GlobalConstants.RealmToName(player.Realm)} territory, dungeons and shared RvR areas.");
         if (entries.Count == 0)
         {
             DisplayMessage(client, "No matching XP monsters are available in your realm territory or shared RvR areas.");

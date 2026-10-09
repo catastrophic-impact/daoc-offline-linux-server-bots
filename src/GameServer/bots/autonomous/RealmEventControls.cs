@@ -90,6 +90,11 @@ namespace DOL.GS
                         bool reset = AutonomousRealmRaid.ResetCooldown(request.TargetId);
                         Complete(request, reset, reset ? "Event cooldown cleared. The boss must still actually be alive." : "An active expedition cannot be reset.");
                     }
+                    else if (request.Action == "stop" && request.Confirmed)
+                    {
+                        bool stopped = AutonomousRealmRaid.Stop(request.TargetId, out string stopReason);
+                        Complete(request, stopped, stopReason);
+                    }
                     else if (request.Action == "start")
                     {
                         bool raidAccepted = AutonomousRealmRaid.Start(request.TargetId, (eRealm)request.Realm, out string raidReason, forced: true);
@@ -108,6 +113,7 @@ namespace DOL.GS
                     Complete(request, reset, reset ? "Event cooldown cleared. No monsters were respawned." : "An active event cannot have its cooldown reset.");
                     return;
                 }
+                if (request.Action == "stop") { Complete(request, false, "Stop event is for dragon and epic dungeon expeditions; keep sieges end on their own."); return; }
                 if (request.Action != "start") { Complete(request, false, "Unknown action or missing confirmation."); return; }
                 var target = new AutonomousRvrEventLayer.LiveObjective(request.TargetId, keep.Name,
                     keep.IsRelic ? AutonomousRvrEventLayer.Intent.AssaultRelicKeep : AutonomousRvrEventLayer.Intent.AssaultKeep,

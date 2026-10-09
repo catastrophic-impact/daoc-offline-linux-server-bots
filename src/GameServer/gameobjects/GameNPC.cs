@@ -2934,10 +2934,20 @@ namespace DOL.GS
 
 			if (killer != null)
 			{
-				Message.SystemToArea(this, $"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, killer);
+				if (this is GameBot)
+				{
+					// Owner 2026-10-07: an enemy gamebot's real name showed in the death line. Each viewer reads the name
+					// they see (its race for an enemy realm's gamebot; AutonomousNameMask).
+					foreach (GamePlayer viewer in GetPlayersInRadius(WorldMgr.INFO_DISTANCE))
+						viewer.Out.SendMessage($"{AutonomousNameMask.NameFor(viewer, this, 0, true)} dies!", eChatType.CT_PlayerDied, eChatLoc.CL_SystemWindow);
+				}
+				else
+				{
+					Message.SystemToArea(this, $"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, killer);
 
-				if (killer is GamePlayer player)
-					player.Out.SendMessage($"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, eChatLoc.CL_SystemWindow);
+					if (killer is GamePlayer player)
+						player.Out.SendMessage($"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, eChatLoc.CL_SystemWindow);
+				}
 
 				// Deal out experience, realm points, loot... Based on server rules.
 				GameServer.ServerRules.OnNpcKilled(this, killer);
@@ -3449,6 +3459,8 @@ namespace DOL.GS
 				case eSpellType.DamageShield:
 				case eSpellType.DamageAdd:
 				case eSpellType.DirectDamage:
+				// Known issue 2026-10-07: "no variance" nukes (lammia seductress's Scorcher DD / Ice Blast) skipped scaling.
+				case eSpellType.DirectDamageNoVariance:
 				case eSpellType.Lifedrain:
 				case eSpellType.DamageSpeedDecrease:
 				case eSpellType.StyleBleeding:

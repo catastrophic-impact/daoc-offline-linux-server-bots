@@ -94,7 +94,7 @@ public static class AutonomousRouteHotspotRepair
     [
         new(31189, 27479), // Tora
         new(32499, 28664), // Cruella de Vil
-        new(32250, 28294), // Brynhild: separate raised realm-exchange service pocket
+        new(32250, 28294), // vault-keeper corridor (Brynhild's old spot, moved 2026-10-02); keeps the escape
     ];
     private static readonly Vector3 CotswoldEastGateRoad = new(553118, 513222, 2896);
     // The portal landing and its former 313848,474886 escape belong to the

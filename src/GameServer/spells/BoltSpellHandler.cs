@@ -77,7 +77,7 @@ namespace DOL.GS.Spells
             else
             {
                 ad.AttackResult = eAttackResult.Blocked;
-                MessageToLiving(ad.Target, $"You partially block {Caster.GetName(0, false)}'s spell!", eChatType.CT_Missed);
+                MessageToLiving(ad.Target, $"You partially block {AutonomousNameMask.NameFor(ad.Target as GamePlayer, Caster, 0, false)}'s spell!", eChatType.CT_Missed);
                 MessageToCaster($"{ad.Target.GetName(0, true)} blocks!", eChatType.CT_YouHit);
             }
 
@@ -128,7 +128,7 @@ namespace DOL.GS.Spells
             else
                 MessageToCaster($"You miss!", eChatType.CT_YouHit);
 
-            MessageToLiving(target, Caster.GetName(0, false) + " missed!", eChatType.CT_Missed);
+            MessageToLiving(target, AutonomousNameMask.NameFor(target as GamePlayer, Caster, 0, false) + " missed!", eChatType.CT_Missed);
         }
 
         public void BaseStartSpell(GameLiving target)

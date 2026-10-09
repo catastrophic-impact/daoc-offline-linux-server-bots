@@ -65,4 +65,21 @@ public static class AutonomousZonePointApproach
 
         return false;
     }
+
+    /// <summary>
+    /// Candidate filter for service NPCs: the trading point must see the NPC
+    /// across walkable floor. A point connected by a short walk can still sit
+    /// behind a pillar or hallway wall, and bots then traded through it.
+    /// Null (no filter) where there is no mesh or no floor under the NPC.
+    /// </summary>
+    public static Func<Vector3, bool> ClearSightOf(IPathfindingMgr nav, Zone zone, Vector3 service)
+    {
+        if (nav == null || zone == null || !nav.IsAvailable || !nav.HasNavmesh(zone))
+            return null;
+        Vector3? floor = nav.GetClosestPoint(zone, service, 24, 24, 64, nav.DefaultFilters);
+        if (!floor.HasValue)
+            return null;
+        Vector3 target = floor.Value;
+        return candidate => nav.HasLineOfSight(zone, candidate, target, nav.DefaultFilters);
+    }
 }

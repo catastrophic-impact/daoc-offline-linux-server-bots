@@ -141,6 +141,7 @@ namespace DOL.GS.Keeps
 		/// <param name="capturingrealm">The realm that captured the keep</param>
 		public static void BroadcastKeepTakeMessage(string message, eRealm capturingrealm)
 		{
+			if (!GameWideAnnouncements.Enabled(AnnouncementKind.RvrBattleground)) return;
 			foreach (GamePlayer player in ClientService.Instance.GetPlayers())
 			{
 				player.Out.SendMessage(message, eChatType.CT_Important, eChatLoc.CL_SystemWindow);

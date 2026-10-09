@@ -6,20 +6,24 @@ using System.Text.Json.Serialization;
 namespace OfflineDaoc.Configuration;
 
 // Linked into the launcher: validation, defaults and disk format have one owner.
-public sealed record BotGoalWeights(int SoloPve, int GroupPve, int RvR)
+// Battlegrounds (added 2026-10-07) defaults to 0, so settings files saved before it stay valid.
+public sealed record BotGoalWeights(int SoloPve, int GroupPve, int RvR, int Battlegrounds = 0)
 {
-    public int Total => SoloPve + GroupPve + RvR;
-    public bool Allows(int kind) => kind switch { 0 => SoloPve > 0, 1 => GroupPve > 0, 2 => RvR > 0, _ => false };
+    public int Total => SoloPve + GroupPve + RvR + Battlegrounds;
+    public bool Allows(int kind) => kind switch { 0 => SoloPve > 0, 1 => GroupPve > 0, 2 => RvR > 0, 3 => Battlegrounds > 0, _ => false };
 
-    public int Choose(double roll, bool excludeGroup = false)
+    // excludeBattlegrounds: the level has no battleground bracket (1-14, 36-50).
+    public int Choose(double roll, bool excludeGroup = false, bool excludeBattlegrounds = false)
     {
         if (!double.IsFinite(roll) || roll < 0 || roll >= 1) throw new ArgumentOutOfRangeException(nameof(roll));
         int group = excludeGroup ? 0 : GroupPve;
-        int total = SoloPve + group + RvR;
-        // Group-only populations must wait for a legal roster, not silently solo.
-        if (total == 0) return 1;
+        int battlegrounds = excludeBattlegrounds ? 0 : Battlegrounds;
+        int total = SoloPve + group + RvR + battlegrounds;
+        // A battleground-only row grinds solo while no bracket fits; group-only populations must wait for a
+        // legal roster, not silently solo.
+        if (total == 0) return Battlegrounds > 0 && excludeBattlegrounds ? 0 : 1;
         double value = roll * total;
-        return value < SoloPve ? 0 : value < SoloPve + group ? 1 : 2;
+        return value < SoloPve ? 0 : value < SoloPve + group ? 1 : value < SoloPve + group + RvR ? 2 : 3;
     }
 }
 
@@ -43,12 +47,13 @@ public sealed record BotGoalSettings
         ValidateRow(Levels20To49, "Levels 20–49");
         ValidateRow(Level50, "Level 50");
         if (Levels1To19.RvR != 0) throw new InvalidDataException("Levels 1–19 cannot have RvR goals.");
+        if (Level50.Battlegrounds != 0) throw new InvalidDataException("Level 50 cannot have battleground goals (the battlegrounds are for levels 15–35).");
     }
 
     private static void ValidateRow(BotGoalWeights row, string name)
     {
-        if (row == null || row.SoloPve < 0 || row.GroupPve < 0 || row.RvR < 0 ||
-            row.SoloPve > 100 || row.GroupPve > 100 || row.RvR > 100 || row.Total != 100)
+        if (row == null || row.SoloPve < 0 || row.GroupPve < 0 || row.RvR < 0 || row.Battlegrounds < 0 ||
+            row.SoloPve > 100 || row.GroupPve > 100 || row.RvR > 100 || row.Battlegrounds > 100 || row.Total != 100)
             throw new InvalidDataException(name + ": percentages must be 0–100 and add up to exactly 100%.");
     }
 

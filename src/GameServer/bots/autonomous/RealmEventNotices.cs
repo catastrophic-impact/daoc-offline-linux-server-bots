@@ -21,8 +21,39 @@ namespace DOL.GS
             }
         }
 
+        // Realm-wide one-line announcements at the top of the screen (no sound, not in the chat box),
+        // for the moment a siege begins. Sent from Pulse, never while an event lock is held.
+        private static readonly Dictionary<(string, eRealm), (string Text, AnnouncementKind Kind)> PendingScreen = new();
+
+        public static void QueueScreen(string id, eRealm realm, string text, AnnouncementKind kind)
+        {
+            if (realm == eRealm.None || string.IsNullOrWhiteSpace(text) || !GameWideAnnouncements.Enabled(kind)) return;
+            lock (Sync)
+            {
+                if (PendingScreen.Count < 32 || PendingScreen.ContainsKey((id, realm)))
+                    PendingScreen[(id, realm)] = (text, kind);
+            }
+        }
+
+        private static void FlushScreen()
+        {
+            KeyValuePair<(string, eRealm), (string Text, AnnouncementKind Kind)>[] screen;
+            lock (Sync)
+            {
+                if (PendingScreen.Count == 0) return;
+                screen = PendingScreen.ToArray();
+                PendingScreen.Clear();
+            }
+            foreach (var notice in screen)
+                if (GameWideAnnouncements.Enabled(notice.Value.Kind))
+                    foreach (GamePlayer player in ClientService.Instance.GetPlayersOfRealm(notice.Key.Item2))
+                    player.Out.SendMessage(notice.Value.Text, PacketHandler.eChatType.CT_ScreenCenter, PacketHandler.eChatLoc.CL_SystemWindow);
+        }
+
         public static void Pulse(long now)
         {
+            FlushScreen();
+            GameWideAnnouncements.Flush();
             List<(string EventId, eRealm Realm, string Text)> outgoing = new();
             lock (Sync)
             {

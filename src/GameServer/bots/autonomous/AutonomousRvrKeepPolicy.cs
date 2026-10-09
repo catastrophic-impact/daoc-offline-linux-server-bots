@@ -9,7 +9,9 @@ namespace DOL.GS
     {
         public static bool IsSiegeObjective(AbstractGameKeep keep)
         {
-            return keep != null && !keep.IsPortalKeep && keep.Realm != eRealm.None;
+            // Battleground central keeps start neutral (realm none) and are taken from that state.
+            return keep != null && !keep.IsPortalKeep &&
+                   (keep.Realm != eRealm.None || BattlegroundBrackets.IsBattlegroundRegion(keep.Region));
         }
     }
 }

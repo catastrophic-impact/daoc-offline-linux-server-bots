@@ -69,7 +69,7 @@ public class UT_AutonomousBotDecisionEngine
     }
 
     [Test]
-    public void SelectionWithinEnvironmentRemainsUniformWithoutNearestOrDensityBias()
+    public void OutdoorSelectionIsWeightedByLiveSpawnsWithoutNearestBias()
     {
         var state = State();
         var camps = new[]
@@ -86,16 +86,20 @@ public class UT_AutonomousBotDecisionEngine
 
         AutonomousBotDecisionEngine.Camp near = AutonomousBotDecisionEngine.SelectWithinEnvironment(
             camps, AutonomousBotDecisionEngine.PveEnvironment.Outdoor, new IndexRandom(0));
+        // Weights: near-crowded 6 (99 spawns, capped), far 1, frontier 2. Distance never counts.
+        AutonomousBotDecisionEngine.Camp alsoNear = AutonomousBotDecisionEngine.SelectWithinEnvironment(
+            camps, AutonomousBotDecisionEngine.PveEnvironment.Outdoor, new IndexRandom(5));
         AutonomousBotDecisionEngine.Camp far = AutonomousBotDecisionEngine.SelectWithinEnvironment(
-            camps, AutonomousBotDecisionEngine.PveEnvironment.Outdoor, new IndexRandom(1));
+            camps, AutonomousBotDecisionEngine.PveEnvironment.Outdoor, new IndexRandom(6));
         AutonomousBotDecisionEngine.Camp frontier = AutonomousBotDecisionEngine.SelectWithinEnvironment(
-            camps, AutonomousBotDecisionEngine.PveEnvironment.Outdoor, new IndexRandom(2));
+            camps, AutonomousBotDecisionEngine.PveEnvironment.Outdoor, new IndexRandom(7));
         AutonomousBotDecisionEngine.Camp dungeon = AutonomousBotDecisionEngine.SelectWithinEnvironment(
             camps, AutonomousBotDecisionEngine.PveEnvironment.Dungeon, new IndexRandom(0));
 
         Assert.Multiple(() =>
         {
             Assert.That(near.Id, Is.EqualTo("near-crowded"));
+            Assert.That(alsoNear.Id, Is.EqualTo("near-crowded"));
             Assert.That(far.Id, Is.EqualTo("far-same-frog"));
             Assert.That(dungeon.Id, Is.EqualTo("dungeon"));
             Assert.That(frontier.Id, Is.EqualTo("frontier-pve"));

@@ -28,8 +28,12 @@ namespace DOL.GS
         private static readonly ConditionalWeakTable<Group, State> States = new();
         private static readonly ConditionalWeakTable<GameBot, State> Holding = new();
 
+        // Every PvE party of three or more pulls from range into the party (owner, 2026-10-06): a tank
+        // walking into a large pack never works at any level. allLevelFifty is kept for callers.
+        public const int MinimumPullParty = 3;
+        public const float MaximumFiringAdvance = 450;
         public static bool UsesDefensivePull(bool groupPve, int memberCount, bool allLevelFifty) =>
-            groupPve && memberCount == 8 && allLevelFifty;
+            groupPve && memberCount >= MinimumPullParty;
 
         public static bool IsPullSpell(Spell spell, int level) => spell != null && spell.Level <= level &&
             spell.Target == eSpellTarget.ENEMY && spell.Range >= 1000 && spell.Radius == 0 && spell.Damage > 0 && !spell.NeedInstrument &&
@@ -63,7 +67,7 @@ namespace DOL.GS
 
         public static bool IsScopedFlyingHandoff(ushort region, GameNPC.eFlags flags,
             bool designatedHasMeleeApproach, bool groupCanPull) =>
-            region is 249 or 60 or 160 or 191 &&
+            region is 248 or 249 or 60 or 160 or 191 &&
             (flags & GameNPC.eFlags.FLYING) != 0 && !designatedHasMeleeApproach && groupCanPull;
 
         /// <summary>Only a DF/epic-dungeon flyer unreachable by the normal
@@ -129,24 +133,26 @@ namespace DOL.GS
                 SavageBotCombatPolicy.MustMeleePull((eCharacterClass)shooter.CharacterClass.ID))
                 return false;
             if (shooter?.Group == null ||
-                !flyingHandoff && !AutonomousBotGroupCoordinator.IsLevelFiftyPveGroup(shooter.Group)) return false;
+                !flyingHandoff && !AutonomousBotGroupCoordinator.UsesDefensivePullGroup(shooter.Group)) return false;
             State state = States.GetOrCreateValue(shooter.Group);
             lock (state)
             {
                 if (state.Active || GameLoop.GameLoopTime < state.RetryAfter) return true;
                 GameBot[] members = shooter.Group.GetMembersInTheGroup().OfType<GameBot>().ToArray();
-                if (members.Length < (flyingHandoff ? 2 : 8) ||
-                    !flyingHandoff && members.Length != 8 ||
+                if (members.Length < (flyingHandoff ? 2 : MinimumPullParty) ||
                     target?.IsAlive != true || shooter.CurrentRegion != target.CurrentRegion)
                     return true;
                 // An enemy already in the party is a real defensive fight, not a ranged pull.
                 if (!flyingHandoff && members.Any(member => member.IsWithinRadius(target, ContactRadius))) return false;
-                state.RetryAfter = GameLoop.GameLoopTime + TimeoutMilliseconds;
                 Spell spell = flyingHandoff ? ReadyPullSpell(shooter) : PullSpell(shooter);
+                // A puller with no ranged pull at all (common below level 50) pulls the ordinary way;
+                // reporting "handled" here left such a party standing at its camp for good.
+                if (spell == null && !flyingHandoff && !HasRangedPull(shooter)) return false;
+                state.RetryAfter = GameLoop.GameLoopTime + TimeoutMilliseconds;
                 eActiveWeaponSlot previous = shooter.ActiveWeaponSlot;
                 if (spell == null)
                 {
-                    if (flyingHandoff ? !HasUsableDistanceWeapon(shooter) : !HasRangedPull(shooter)) return true;
+                    if (flyingHandoff && !HasUsableDistanceWeapon(shooter)) return true;
                     shooter.SwitchWeapon(eActiveWeaponSlot.Distance);
                 }
                 int range = spell?.Range ?? shooter.attackComponent.AttackRange;
@@ -154,6 +160,15 @@ namespace DOL.GS
                 if (!TryFiringPoint(PathfindingProvider.Instance, shooter.CurrentZone, origin, enemy, range, out Vector3 point))
                 {
                     shooter.SwitchWeapon(previous);
+                    // Merely too far for the short proven approach: the party keeps walking in and the
+                    // camp check (every 1.5 s) pulls once in range. Holding here stood parties 2,000
+                    // units from their camp (1,087 unreachable pulls in run 11's first hour, mostly
+                    // low-level parties with short pull ranges).
+                    if (Vector3.Distance(origin, enemy) - (range - 100) > MaximumFiringAdvance)
+                    {
+                        state.RetryAfter = 0;
+                        return false;
+                    }
                     LoggerManager.Create(typeof(AutonomousDefensivePull)).Info(
                         $"AUTONOMOUS_DEFENSIVE_PULL_UNREACHABLE bot={shooter.Name} target={target.Name} region={shooter.CurrentRegionID} x={shooter.X} y={shooter.Y} z={shooter.Z}");
                     return true;
@@ -199,7 +214,7 @@ namespace DOL.GS
             float distance = Vector3.Distance(origin, target);
             float advance = Math.Max(0, distance - (range - 100));
             // No solo expedition into a pack: at most a short, proven approach from the party.
-            if (advance > 450) return false;
+            if (advance > MaximumFiringAdvance) return false;
             Vector3 desired = advance == 0 ? origin : Vector3.Lerp(origin, target, advance / distance);
             if (!AutonomousNavigationSurface.TryFloor(nav, zone, desired, out point)) return false;
             return Vector3.Distance(origin, point) <= 450 && Vector3.Distance(point, target) <= range - 50 &&

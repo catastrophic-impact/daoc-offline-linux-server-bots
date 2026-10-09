@@ -19,6 +19,7 @@ namespace DOL.GS
             "Timed out" => Pick($"Our time at {name} is spent. We could not finish the fight; rally home and tend the wounded.",
                 $"The expedition to {name} must withdraw. No victory this time, but we shall return."),
             "Failed rally" => $"Not enough of our company reached {name} in time. The muster is called off; save your strength for another day.",
+            "Stopped by player" => $"The expedition to {name} is called off. Fall back and rest, companions.",
             _ => $"The expedition at {name} has ended without a confirmed victory. Return safely, companions."
         };
 

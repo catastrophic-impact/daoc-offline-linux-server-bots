@@ -47,9 +47,34 @@ namespace DOL.GS
             "a714840c-3c7f-40ac-823d-6daa722472ae", // giant beetle, Cliffs of Moher: grovewood 38-40 at 325
             "738dcc64-f1d5-4644-b8f5-b10c3608bc7b", // koalinth sentinel, Cliffs of Moher: cliff dweller 36-38 at 206
             "b181e3f8-c434-4dc3-aa12-45f02f4004fe", // koalinth sentinel, Cliffs of Moher: cliff dweller 36-38 at 567
+
+            // Every wiggle worm in Bog of Cullen (all 13, audited 2026-10-01). Level 0
+            // ambient worms in a zone whose monsters are mostly level 40+: they
+            // con blue to level 1 bots, which then walked across the realm into
+            // that zone for almost no XP and died on the way.
+            "30a66daf-1655-4961-b140-bc8269481fd8",
+            "9c8aa63b-abca-4f2b-99fa-dc974adc5e49",
+            "27ed2dfc-39bf-49c6-ae49-8d3980a6a6d1",
+            "926313a3-a713-439a-bee9-4868f2dc60d0",
+            "27d209e2-503c-44db-a4ec-6ea72079d9a1",
+            "89f8f5de-42c5-4b83-a8f7-be0d42f8f599",
+            "86000309-c6e5-4204-90cc-de753e4a42fb",
+            "35a3cb9e-8f54-462e-ba4f-122f1bffd539",
+            "2205b343-8eab-415c-b3d4-217d6a7b2d93",
+            "ffff829e-dfcd-4ef5-aa01-4936470426bd",
+            "600f6a45-b6bc-4664-af6b-fab72799a668",
+            "2559e2ef-7151-4cc7-a1bf-b89e1ed5e254",
+            "fdad6d7b-3c93-475a-8fba-8adcb7d49440",
         };
 
         public static bool IsBotExcludedSpawn(string internalId) =>
             !string.IsNullOrEmpty(internalId) && BotExcludedSpawnIds.Contains(internalId);
+
+        /// <summary>
+        /// Spawns gamebots never hunt: the audited list above plus classic quest monsters (a player's quest event
+        /// spawn or a named quest monster), so a bot never takes a player's quest kill.
+        /// </summary>
+        public static bool IsBotExcludedNpc(GameNPC npc) =>
+            npc != null && (IsBotExcludedSpawn(npc.InternalID) || Quests.ClassicQuests.IsQuestMonster(npc));
     }
 }

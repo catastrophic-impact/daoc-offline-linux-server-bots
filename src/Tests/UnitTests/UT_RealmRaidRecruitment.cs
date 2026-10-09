@@ -12,17 +12,50 @@ namespace DOL.UnitTests;
 public class UT_RealmRaidRecruitment
 {
     [TestCase(false, 60, false)] [TestCase(false, 89, false)] [TestCase(false, 90, true)]
-    [TestCase(true, 89, false)] [TestCase(true, 90, true)]
-    public void AutomaticRallyNowHasNinetyMinutesWhileForcedLimitIsUnchanged(bool forced, int minutes, bool expired) =>
+    [TestCase(true, 89, false)] [TestCase(true, 90, false)] [TestCase(true, 24 * 60, false)]
+    public void AutomaticRallyHasNinetyMinutesAndForcedRallyNeverExpires(bool forced, int minutes, bool expired) =>
         Assert.That(RealmRaidRecruitmentPolicy.StagingExpired(forced, minutes * 60_000L), Is.EqualTo(expired));
 
     [Test]
     public void BattleAndEarlyStartRulesAreUnchanged()
     {
         Assert.That(RealmRaidRecruitmentPolicy.BattleMilliseconds, Is.EqualTo(4 * 60 * 60_000L));
-        Assert.That(RealmRaidRecruitmentPolicy.ForcedStagingMilliseconds, Is.EqualTo(45 * 60_000L));
         Assert.That(RealmRaidRecruitmentPolicy.Ready(false,15 * 60_000L,200,true),Is.True);
         Assert.That(RealmRaidRecruitmentPolicy.MaximumBots,Is.EqualTo(300));
+    }
+
+    [Test]
+    public void ForcedRaidStartsAtTwoHundredWithNoTimeLimit()
+    {
+        // No 45-minute muster wait: 200 staged (and a landed dragon) is enough at once.
+        Assert.That(RealmRaidRecruitmentPolicy.Ready(true, 0, 200, true), Is.True);
+        Assert.That(RealmRaidRecruitmentPolicy.Ready(true, 60_000L, 199, true), Is.False);
+        Assert.That(RealmRaidRecruitmentPolicy.Ready(true, 0, 250, false), Is.False, "a dragon must still land");
+        // Automatic rallies keep their 15-minute minimum.
+        Assert.That(RealmRaidRecruitmentPolicy.Ready(false, 60_000L, 250, true), Is.False);
+        // Battles: automatic four hours, forced until the player stops it.
+        Assert.That(RealmRaidRecruitmentPolicy.BattleExpired(false, 100, 100), Is.True);
+        Assert.That(RealmRaidRecruitmentPolicy.BattleExpired(true, long.MaxValue - 1, 100), Is.False);
+    }
+
+    [Test]
+    public void ForcedRecruitsAreRankedByDistanceToTheRallyHub()
+    {
+        var hub = new System.Numerics.Vector3(1000, 1000, 0);
+        double near = AutonomousBotGroupCoordinator.ForcedRecruitDistance(1, 1300, 1400, 1, hub);
+        double far = AutonomousBotGroupCoordinator.ForcedRecruitDistance(1, 90000, 1000, 1, hub);
+        double otherRegion = AutonomousBotGroupCoordinator.ForcedRecruitDistance(100, 1000, 1000, 1, hub);
+        Assert.That(near, Is.EqualTo(500).Within(0.001));
+        Assert.That(near, Is.LessThan(far));
+        Assert.That(far, Is.LessThan(otherRegion), "bots in another region come after every same-region bot");
+    }
+
+    [Test]
+    public void OnlyDragonRalliesAnnounceThatTheDragonMustLand()
+    {
+        Assert.That(AutonomousRealmRaid.ForcedStartCondition(false), Does.Contain("dragon must land"));
+        Assert.That(AutonomousRealmRaid.ForcedStartCondition(true), Does.Not.Contain("dragon"));
+        Assert.That(AutonomousRealmRaid.ForcedStartCondition(true), Does.Contain("dungeon"));
     }
     [TestCase(49, true, false, false, false)] [TestCase(50, true, false, false, true)]
     [TestCase(50, false, false, false, false)] [TestCase(50, true, true, false, false)]
@@ -30,7 +63,7 @@ public class UT_RealmRaidRecruitment
     public void OnlyLevelFiftyAutonomousBotsAreEligible(int level, bool autonomous, bool temporary, bool playerLed, bool expected) =>
         Assert.That(RealmRaidRecruitmentPolicy.Eligible(level, autonomous, temporary, playerLed), Is.EqualTo(expected));
 
-    [TestCase(true, 44, 240, true, false)] [TestCase(true, 45, 200, true, true)]
+    [TestCase(true, 0, 240, true, true)] [TestCase(true, 45, 200, true, true)] // forced: no muster wait
     [TestCase(true, 45, 199, true, false)] [TestCase(true, 50, 240, false, false)]
     [TestCase(false, 14, 240, true, false)] [TestCase(false, 15, 200, true, true)]
     [TestCase(false, 45, 199, true, false)] [TestCase(false, 59, 8, true, false)]
@@ -182,7 +215,7 @@ public class UT_RealmRaidRecruitment
     [Test] public void StagingDoesNotHoldBotsForever()
     {
         Assert.That(RealmRaidRecruitmentPolicy.StagingExpired(true, 89 * 60000L), Is.False);
-        Assert.That(RealmRaidRecruitmentPolicy.StagingExpired(true, 90 * 60000L), Is.True);
+        Assert.That(RealmRaidRecruitmentPolicy.StagingExpired(true, 90 * 60000L), Is.False, "forced rallies wait until the player stops them");
         Assert.That(RealmRaidRecruitmentPolicy.StagingExpired(false, 60 * 60000L), Is.False);
         Assert.That(RealmRaidRecruitmentPolicy.StagingExpired(false, 90 * 60000L), Is.True);
         Assert.That(RealmRaidRecruitmentPolicy.JoinExistingChance, Is.GreaterThan(.65));

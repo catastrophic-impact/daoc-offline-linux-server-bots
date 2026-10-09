@@ -103,7 +103,12 @@ namespace DOL.GS
 
         public static bool LegalEnemy(GameLiving owner, GameLiving target) => owner?.IsAlive == true && target?.IsAlive == true &&
             target.ObjectState == GameObject.eObjectState.Active && owner.CurrentRegion == target.CurrentRegion &&
-            target.Realm != eRealm.None && target.Realm != owner.Realm && GameServer.ServerRules.IsAllowedToAttack(owner, target, true);
+            (target.Realm != eRealm.None || NeutralBattlegroundKeep(target)) && target.Realm != owner.Realm &&
+            GameServer.ServerRules.IsAllowedToAttack(owner, target, true);
+
+        // Battleground central keeps start unclaimed (realm none); their doors and guards are still fair siege targets.
+        private static bool NeutralBattlegroundKeep(GameLiving target) =>
+            BattlegroundBrackets.IsBattlegroundRegion(target.CurrentRegionID) && target is Keeps.GameKeepDoor or Keeps.GameKeepGuard;
 
         public static bool CanDamage(GameSiegeWeapon weapon, GameLiving target)
         {
@@ -113,7 +118,10 @@ namespace DOL.GS
             if (weapon is GameSiegeRam)
                 return target is GameKeepDoor { State: eDoorState.Closed } && range <= weapon.attackComponent.AttackRange;
             if (range < weapon.MinAttackRange || range > weapon.MaxAttackRange) return false;
-            return Visible(weapon, target);
+            // Catapults and trebuchets lob onto a ground target in an arc, as players used them: no line of sight.
+            // A ballista fires directly: it needs a clear shot, or a target standing up on a wall.
+            if (weapon is GameSiegeCatapult) return true;
+            return target.Z - weapon.Z > 150 || Visible(weapon, target);
         }
 
         public static bool Visible(GameLiving source, GameLiving target)

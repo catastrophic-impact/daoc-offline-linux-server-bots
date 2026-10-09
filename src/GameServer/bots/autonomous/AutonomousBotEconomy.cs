@@ -232,12 +232,25 @@ namespace DOL.GS;
                 return false;
 
             DbInventoryItem equipped = bot.Inventory.GetItem(equipSlot);
+            if (DisplacesOffhandWeapon(item, equipped))
+                return false;
             if (bot.CharacterClass?.ID == (int)eCharacterClass.Savage &&
                 BotWeaponStats.IsMeleeWeapon((eObjectType)item.Object_Type))
                 return SavageBotWeaponPolicy.IsUpgrade(bot, item, equipSlot);
             int improvement = EquipmentValue(item) - EquipmentValue(equipped);
             return equipped == null || improvement > MinimumEquipmentUpgrade;
         }
+
+        /// <summary>
+        /// Compares against what the move actually displaces (the idea behind the
+        /// stefanrows/OfflineDAoC fork's shield/two-hander loop fix, 0b76744). A shield is
+        /// never an upgrade over a weapon the build wields in its left hand: Savages swapped a
+        /// shield and their hand-to-hand offhand back and forth every 11 seconds (up to 177
+        /// times per bot in one log), saving inventory each time.
+        /// </summary>
+        public static bool DisplacesOffhandWeapon(DbInventoryItem item, DbInventoryItem equipped) =>
+            item != null && equipped != null && (eObjectType)item.Object_Type == eObjectType.Shield &&
+            BotWeaponStats.IsMeleeWeapon((eObjectType)equipped.Object_Type);
 
         /// <summary>
         /// Equips an already-owned backpack item. MoveItem swaps an existing equipped item back

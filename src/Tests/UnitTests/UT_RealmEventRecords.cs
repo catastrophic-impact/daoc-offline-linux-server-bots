@@ -31,4 +31,28 @@ public class UT_RealmEventRecords
         Assert.That(Field("Active")["test"].Id,Is.Not.EqualTo(first));
         Assert.That(Field("Pending").Count,Is.EqualTo(2));
     }
+
+    [Test]
+    public void DeleteAllEmptiesOnlyTheRecordLedger()
+    {
+        string folder=System.IO.Path.Combine(System.IO.Path.GetTempPath(),"realm-records-"+Guid.NewGuid().ToString("N"));
+        string path=System.IO.Path.Combine(folder,"realm-event-records.sqlite3");
+        string neighbour=System.IO.Path.Combine(folder,"opendaoc.sqlite3.db");
+        try
+        {
+            Assert.That(RealmEventRecordStore.DeleteAll(path),Is.EqualTo(0),"a missing ledger is not created");
+            Assert.That(System.IO.File.Exists(path),Is.False);
+            RealmEventRecordStore.Save(path,new[]{
+                new RealmEventRecord("a","dragon-albion","Golestandt","Dragon","Albion","2026-10-01T00:00:00Z","2026-10-01T01:00:00Z","Ended","Boss defeated","",300,210),
+                new RealmEventRecord("b","keep","Caer Benowyc","Keep","Midgard","2026-10-02T00:00:00Z","","Battle","In progress","",50,40)});
+            System.IO.File.WriteAllText(neighbour,"game data");
+            Assert.That(RealmEventRecordStore.DeleteAll(path),Is.EqualTo(2));
+            Assert.That(RealmEventRecordStore.Read(path,"","","","",0).Total,Is.EqualTo(0));
+            Assert.That(System.IO.File.ReadAllText(neighbour),Is.EqualTo("game data"));
+            // The server can keep saving into the emptied ledger.
+            RealmEventRecordStore.Save(path,new[]{new RealmEventRecord("c","keep","Caer Benowyc","Keep","Midgard","2026-10-03T00:00:00Z","","Battle","In progress","",50,40)});
+            Assert.That(RealmEventRecordStore.Read(path,"","","","",0).Total,Is.EqualTo(1));
+        }
+        finally{System.Data.SQLite.SQLiteConnection.ClearAllPools();if(System.IO.Directory.Exists(folder))System.IO.Directory.Delete(folder,true);}
+    }
 }

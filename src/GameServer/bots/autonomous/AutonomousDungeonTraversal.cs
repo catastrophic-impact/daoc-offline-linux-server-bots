@@ -10,6 +10,9 @@ namespace DOL.GS
     {
         private long _nextDungeonScanTick;
         private bool _dungeonTravelHeld;
+        private GameNPC _dungeonThreatHoldBlocker;
+        private long _dungeonThreatHoldSince;
+        public const long DungeonThreatHoldLimitMilliseconds = 90_000;
         private Vector3[] _dungeonProbeNodes;
         private Vector3 _dungeonProbeOrigin;
         private Vector3 _dungeonProbeDestination;
@@ -116,6 +119,7 @@ namespace DOL.GS
             }
             if (blocker == null) return false;
             _dungeonTravelHeld = true;
+            if (_dungeonThreatHoldBlocker != null && _dungeonThreatHoldBlocker != blocker) _dungeonThreatHoldBlocker = null;
             bot.StopMovingOnPath();
             bot.StopMoving();
 
@@ -159,9 +163,17 @@ namespace DOL.GS
             if (!rejoiningLeader && (!AutonomousBotGroupCoordinator.CanInitiateNewPull(bot, corridorBlocker: true) ||
                 (_groupDirective?.IsDynamic == true && _groupDirective.Puller != bot)))
             {
-                SetStatus(bot, "Holding before dungeon threat", GoalText(),
-                    "Waiting for the intact group and its designated tank/leader puller before another fight");
-                return true;
+                // Bounded: a puller that is dead or elsewhere never comes. After DungeonThreatHoldLimit
+                // on the same blocker the member clears it; ordinary group defense joins the fight
+                // (109 Summoner's Hall raid members held in Marfach Caverns, 2026-10-06).
+                long holdNow = GameLoop.GameLoopTime;
+                if (_dungeonThreatHoldBlocker != blocker) { _dungeonThreatHoldBlocker = blocker; _dungeonThreatHoldSince = holdNow; }
+                if (holdNow - _dungeonThreatHoldSince < DungeonThreatHoldLimitMilliseconds)
+                {
+                    SetStatus(bot, "Holding before dungeon threat", GoalText(),
+                        "Waiting for the intact group and its designated tank/leader puller before another fight");
+                    return true;
+                }
             }
             // Count the visible aggro pack for diagnostics. A formerly-safe
             // blocker must still be engaged: rejecting the unrelated world
@@ -208,6 +220,9 @@ namespace DOL.GS
 
         private static bool AtRegionCrossing(GameBot bot, DOL.Database.DbZonePoint crossing, int horizontalDistance)
         {
+            // A Shrouded Isles portal is used from its platform, not from the ground beside it.
+            if (ShroudedIslesPortals.TryGetPad(crossing.Id, out Vector3 pad))
+                return ShroudedIslesPortals.IsOnPad(pad, new(bot.X, bot.Y, bot.Z));
             if (CanUseProvenDungeonExit(PathfindingProvider.Instance, bot.CurrentZone,
                     new(bot.X, bot.Y, bot.Z), crossing.Id,
                     new(crossing.SourceX, crossing.SourceY, crossing.SourceZ)))

@@ -90,7 +90,7 @@ public static class AutonomousBotChat
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["{realm}"] = context.Realm.ToString(),
+            ["{realm}"] = GlobalConstants.RealmToName(context.Realm),
             ["{zone}"] = Fallback(context.ZoneName, "this area"),
             ["{monster}"] = Fallback(context.MonsterName, "the local creatures"),
             ["{npc}"] = Fallback(context.NpcName, "the nearest trainer"),

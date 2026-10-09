@@ -12,7 +12,7 @@ namespace DOL.GS
         {
             position = default;
             if (slot < 0 || slot >= RealmRaidRecruitmentPolicy.MaximumParties || nav == null || zone == null || !nav.IsAvailable || !nav.HasNavmesh(zone)) return false;
-            bool epicInterior = zone.ID is 60 or 160 or 191;
+            bool epicInterior = zone.ID is 60 or 160 or 191 or 248 or 249;
             for (int attempt = 0; attempt < (epicInterior ? 22 : 6); attempt++)
             {
                 bool compact = attempt >= 6;

@@ -45,6 +45,17 @@ public static class RealmEventRecordStore
         command.CommandText="UPDATE Events SET Outcome='Interrupted',Phase='Stopped',Details=Details || ' | Previous server session ended without a final outcome; end time unknown.' WHERE Outcome='In progress'";
         command.ExecuteNonQuery();
     }
+    // Launcher "Delete all records": empties this ledger file only. No game data lives here.
+    // An event still running is written again by the server at its next save.
+    public static int DeleteAll(string path)
+    {
+        if(!File.Exists(path))return 0;
+        using var connection=Open(path,false);using var command=connection.CreateCommand();
+        command.CommandText="SELECT count(*) FROM sqlite_master WHERE type='table' AND name='Events'";
+        if((long)command.ExecuteScalar()==0)return 0;
+        command.CommandText="DELETE FROM Events";
+        return command.ExecuteNonQuery();
+    }
     public static (List<RealmEventRecord> Rows,long Total) Read(string path,string realm,string kind,string outcome,string search,int page,int pageSize=100)
     {
         if(!File.Exists(path))return (new(),0);

@@ -26,5 +26,11 @@ namespace DOL.UnitTests
                 Assert.That(AutonomousAuditedCampPolicy.IsBotExcludedSpawn(string.Empty), Is.False);
             });
         }
+
+        [TestCase("30a66daf-1655-4961-b140-bc8269481fd8")]
+        [TestCase("2559e2ef-7151-4cc7-a1bf-b89e1ed5e254")]
+        [TestCase("fdad6d7b-3c93-475a-8fba-8adcb7d49440")]
+        public void LevelZeroBogOfCullenWormsAreNotBotGoals(string wormSpawnId) =>
+            Assert.That(AutonomousAuditedCampPolicy.IsBotExcludedSpawn(wormSpawnId), Is.True);
     }
 }

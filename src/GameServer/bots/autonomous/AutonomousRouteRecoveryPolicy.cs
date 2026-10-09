@@ -13,7 +13,9 @@ public static class AutonomousRouteRecoveryPolicy
     public const int MaximumLocalAttempts = 3;
     public const float ForwardProgressRequired = 240f;
     public const long RepeatedFailureWindowMilliseconds = 10 * 60_000L;
-    public const float RepeatedFailureRadius = 384f;
+    // A keep courtyard is up to ~1,000 units across: bots trapped inside Nottmoor
+    // Faste bounced between two spots ~460 apart and never counted as repeating.
+    public const float RepeatedFailureRadius = 1024f;
     public const int FailuresBeforeSafeRelocation = 3;
     public const long ImmediateRouteFailureCooldownMilliseconds = 30_000;
 
@@ -35,6 +37,12 @@ public static class AutonomousRouteRecoveryPolicy
     public static long ReplanDelayMilliseconds(bool emptyLiveCamp, long actorKey) =>
         (emptyLiveCamp ? 2_500 : ImmediateRouteFailureCooldownMilliseconds) +
         System.Math.Abs(actorKey % 1_500);
+
+    /// <summary>Forward progress only clears the pocket count once the bot is out of the pocket.</summary>
+    public static bool HasLeftFailurePocket(ushort pocketRegion, ushort currentRegion, Vector3 pocket, Vector3 current) =>
+        pocketRegion == 0 || pocketRegion != currentRegion ||
+        Vector2.DistanceSquared(new(pocket.X, pocket.Y), new(current.X, current.Y)) >
+        RepeatedFailureRadius * RepeatedFailureRadius;
 
     public static bool IsSameRepeatedFailurePocket(ushort previousRegion, ushort currentRegion,
         Vector3 previous, Vector3 current, long elapsedMilliseconds) =>

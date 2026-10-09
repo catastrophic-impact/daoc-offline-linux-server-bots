@@ -462,7 +462,9 @@ namespace DOL.GS
             if (owner is GameNPC npc)
                 damage *= npc.DamageFactor;
 
-            if (weapon?.SlotPosition is Slot.TWOHAND or Slot.RANGED)
+            // The Bonedancer debuffer's two-handed bone mace is a look: slower,
+            // harder hits with the same damage per second as its old one-hander.
+            if (weapon?.SlotPosition is Slot.TWOHAND or Slot.RANGED && owner is not BdDebufferSubPet)
                 damage *= CalculateTwoHandedDamageModifier(weapon);
 
             return damage;
@@ -643,7 +645,7 @@ namespace DOL.GS
                     else
                     {
                         if (_startAttackTarget is GameNPC npcTarget)
-                            player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "GamePlayer.StartAttack.CombatTarget", _startAttackTarget.GetName(0, false, player.Client.Account.Language, npcTarget)), eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
+                            player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "GamePlayer.StartAttack.CombatTarget", AutonomousNameMask.NameFor(player, npcTarget, 0, false, player.Client.Account.Language)), eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
                         else
                             player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "GamePlayer.StartAttack.CombatTarget", _startAttackTarget.GetName(0, false)), eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
 
@@ -1984,14 +1986,14 @@ namespace DOL.GS
                     // Message: "You attack <OriginalTarget>, but <FinalTarget> steps in the way!"
                     SendLocalizedMessage(player,
                         "GamePlayer.Attack.Intercepted",
-                        ad.Target.GetName(0, true),
-                        ad.OriginalTarget.GetName(0, false));
+                        AutonomousNameMask.NameFor(player, ad.Target, 0, true),
+                        AutonomousNameMask.NameFor(player, ad.OriginalTarget, 0, false));
                     SendLocalizedMessage(player,
                         "GamePlayer.Attack.InterceptedHit",
                         attackTypeMsg,
-                        ad.OriginalTarget.GetName(0, false),
+                        AutonomousNameMask.NameFor(player, ad.OriginalTarget, 0, false),
                         hitWeapon,
-                        ad.Target.GetName(0, false),
+                        AutonomousNameMask.NameFor(player, ad.Target, 0, false),
                         ad.Damage,
                         modMessage);
                 }
@@ -2000,7 +2002,7 @@ namespace DOL.GS
                     SendLocalizedMessage(player,
                         "GamePlayer.Attack.InterceptHit",
                         attackTypeMsg,
-                        ad.Target.GetName(0, false),
+                        AutonomousNameMask.NameFor(player, ad.Target, 0, false),
                         hitWeapon,
                         ad.Damage,
                         modMessage);
@@ -2009,7 +2011,7 @@ namespace DOL.GS
                 // Send critical hit message if applicable.
                 if (ad.CriticalDamage > 0)
                 {
-                    string baseMessage = LanguageMgr.GetTranslation(player.Client.Account.Language, "GamePlayer.Attack.Critical", ad.Target.GetName(0, false, player.Client.Account.Language, ad.Target as GameNPC), ad.CriticalDamage);
+                    string baseMessage = LanguageMgr.GetTranslation(player.Client.Account.Language, "GamePlayer.Attack.Critical", AutonomousNameMask.NameFor(player, ad.Target, 0, false, player.Client.Account.Language), ad.CriticalDamage);
                     string criticalMessage = $"{baseMessage} ({ad.CriticalChance}%)";
                     player.Out.SendMessage(criticalMessage, eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
                 }
@@ -2465,7 +2467,8 @@ namespace DOL.GS
                 // Block rounds work from the point of view of the attacker and use their attack speed, similar to how interrupts work.
                 // However, according to grab bags, it's supposed to be based on the defender's swing speed. But this sounds very wrong, since it implies haste buffs should make blocking more effective.
 
-                if (attackData.Target is not GamePlayer)
+                // Players and GameBots (real shields with a size) use block rounds.
+                if (attackData.Target is not (GamePlayer or GameBot))
                 {
                     usedBlockRoundCount = 0;
                     return true;

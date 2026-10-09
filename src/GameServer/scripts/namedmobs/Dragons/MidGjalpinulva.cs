@@ -318,6 +318,7 @@ namespace DOL.AI.Brain
 		public static List<GameNPC> DragonAdds = new List<GameNPC>();
 		private List<Point3D> _roamingPathPoints = new List<Point3D>();
 		private int _lastRoamIndex = 0;
+		private readonly DragonFlightWatch _flightWatch = new();
         public readonly DragonEncounterAdds EncounterAdds = new();
 
 		public static bool m_isrestless = false;
@@ -330,8 +331,10 @@ namespace DOL.AI.Brain
 		{
             bool encounterAggro = CheckProximityAggro();
             EncounterAdds.Tick(Body, AggroList.Select(static entry => entry.Key), encounterAggro, IsRestless);
+            if (encounterAggro) DragonDiagnostics.Fighting(Body, AggroList.Count);
 			if (!encounterAggro)
 			{
+				DragonDiagnostics.BeforeReset(Body);
 				Body.Health = Body.MaxHealth;
 				#region !IsRestless
 				if (!IsRestless)
@@ -431,6 +434,8 @@ namespace DOL.AI.Brain
 				Body.Flags = GameNPC.eFlags.FLYING;//make dragon fly mode
 				ResetChecks = false;//reset it so can reset bools at end of path
 				LockIsRestless = true;
+				_flightWatch.Begin(GameLoop.GameLoopTime);
+				log.Info($"DRAGON_TAKEOFF name=\"{Body.Name}\" position={Body.X},{Body.Y},{Body.Z}");
 			}
 
 			if (IsRestless)
@@ -445,6 +450,7 @@ namespace DOL.AI.Brain
 				log.Info($"DRAGON_LANDED name=\"{Body.Name}\" position={Body.X},{Body.Y},{Body.Z} home={Body.SpawnPoint.X},{Body.SpawnPoint.Y},{Body.SpawnPoint.Z}");
 				_lastRoamIndex = 0;
 				ResetChecks = true;//do it only once
+				_flightWatch.End();
 			}
 			if (Body.CurrentRegion.IsNightTime == true && !LockEndRoute)//reset bools to dragon can roam again
 			{			
@@ -491,6 +497,19 @@ namespace DOL.AI.Brain
             {
 				Body.MaxSpeedBase = 400;
 				short speed = 350;
+				long flightNow = GameLoop.GameLoopTime;
+				if (_lastRoamIndex < _roamingPathPoints.Count && _flightWatch.ShouldCutShort(flightNow, _lastRoamIndex))
+				{
+					log.Warn($"DRAGON_FLIGHT_CUT_SHORT name=\"{Body.Name}\" waypoint={_lastRoamIndex}/{_roamingPathPoints.Count} position={Body.X},{Body.Y},{Body.Z}");
+					_lastRoamIndex = _roamingPathPoints.Count;
+					Body.StopMoving();
+				}
+				else if (_lastRoamIndex >= _roamingPathPoints.Count && !DragonFlightLanding.HasArrived(Body, Body.SpawnPoint) && _flightWatch.ShouldForceLanding(flightNow))
+				{
+					log.Warn($"DRAGON_LANDING_FORCED name=\"{Body.Name}\" position={Body.X},{Body.Y},{Body.Z} home={Body.SpawnPoint.X},{Body.SpawnPoint.Y},{Body.SpawnPoint.Z}");
+					Body.StopMoving();
+					Body.MoveInRegion(Body.CurrentRegionID, Body.SpawnPoint.X, Body.SpawnPoint.Y, Body.SpawnPoint.Z, Body.SpawnHeading, true);
+				}
 				
 				if (_lastRoamIndex < _roamingPathPoints.Count && Body.IsWithinRadius(_roamingPathPoints[_lastRoamIndex], 100))
 					_lastRoamIndex++;
