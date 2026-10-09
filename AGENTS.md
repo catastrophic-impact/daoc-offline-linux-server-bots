@@ -21,38 +21,35 @@ built-in Classic + Shrouded Isles world; navmeshes ship as a separate archive. T
 not part of the project. The owner's goal now is to **develop the bots**: smarter, natural
 behaviour, dungeons, battlegrounds, keeps and frontier, and later chat.
 
-## Which folder is which (on the owner's Steam Deck)
+## Folders (on the owner's Steam Deck)
 
-| Folder | Status |
+| Folder | What |
 |---|---|
-| `~/Dev/vscode/OfflineDAoC-main/next/` | **This repo (a real folder). All work happens here.** |
-| `~/Dev/vscode/OfflineDAoC-main/project/` | Link to `~/boxes/daoc-server-box-home/daoc-server-src`: the previous Linux build. **Frozen reference: never modify.** Read it for data or logic if needed. |
-| `~/boxes/daoc-server-box-home/` | The build box's home: `.dotnet/` (SDK) and test server folders only, no source. |
-| `~/boxes/daoc-server-box-home/next-test/daoc-server/` | Dev/test server folder: unpacked release, navmeshes installed, 9 test bots. `tools/dev-deploy.sh` targets it (inside the box: `~/next-test/daoc-server`). |
-| `~/boxes/daoc-server-box-home/daoc-server/` | An older test server folder from `project/`; its `navmesh/` is a source copy of the navmesh set. |
+| `~/Dev/vscode/daoc-offline-linux-server-bots/` | **This repo** (clone of github.com/catastrophic-impact/daoc-offline-linux-server-bots). All work happens here. |
+| `~/boxes/daoc-server-box-home/` | The build box's home: `.dotnet/` (SDK), caches. No source. Put test server folders here (e.g. `test/daoc-server`). |
 
-The box sees `/home/deck` directly, so build the repo in place: inside the box, `cd /home/deck/Dev/vscode/OfflineDAoC-main/next`.
-Inside the box, `~` is the box home, not `/home/deck`.
-| `~/Dev/vscode/OfflineDAoC-main/source/` | The original Offline DAoC 0.33 Windows source (read-only reference, legacy) |
-| `~/boxes/daoc-offlineserver-box/OfflineDAoC/playable-v0.33/` | The owner's 0.33 install (Wine client + pristine 0.33 world DB under `editions/`). Read only. |
-
-`rewrite/` was an abandoned experiment and is deleted; see
-`docs/history/2026-10-01-rewrite-playerbot-findings.md`.
+Upstream is https://github.com/shadowofze/OfflineDAoC (see `UPSTREAM.md`); clone it to a scratch
+folder when you need to compare or pull. Its release zips hold the world DB and navmeshes.
+`rewrite/` and the old `project/` Linux build are gone; see `docs/history/`.
 
 ## Environment and how to run things
 
 - **Host:** SteamOS (read-only root). **Build box:** distrobox `daoc-server-box` (Ubuntu 22.04),
-  home `~/boxes/daoc-server-box-home`, .NET SDK at `~/.dotnet/dotnet` inside it.
+  home `~/boxes/daoc-server-box-home`, .NET SDK at `~/.dotnet/dotnet` inside it. If the box or SDK
+  is missing, run `tools/setup-build-box.sh` on the host (safe to re-run).
+- The box sees `/home/deck` directly: build the repo in place. Inside the box, `~` is the box home.
 - **From an editor sandbox (VS Code flatpak)**, host commands need `flatpak-spawn --host ...`, and
   box commands
   `flatpak-spawn --host distrobox enter daoc-server-box -- bash -lc '...'`. The sandbox `/tmp` is
   private; put shared files under the box home.
+- **No git identity is set globally;** the repo has a local one (catastrophic-impact noreply).
 - **Common commands** (inside the box, from the repo root):
   - Build and test: `cd src && ~/.dotnet/dotnet build DaocServer.sln -c Release && ~/.dotnet/dotnet test Tests/Tests.csproj -c Release --no-build`
-  - Full release: `tools/build-release.sh`. It takes about 2 minutes and creates `dist/`.
-  - Quick bot iteration: `tools/dev-deploy.sh ~/next-test/daoc-server` (about 15 s).
-  - Run the server: `~/next-test/daoc-server/daoc-server.sh start` (or `start --console`).
-  - Admin: `~/next-test/daoc-server/daoc-admin bots list` (and so on).
+  - Full release: `tools/build-release.sh`. About 3 minutes; creates `dist/daoc-server`.
+  - Test server: copy `dist/daoc-server` to `~/test/daoc-server` (box home), then
+    `tools/dev-deploy.sh ~/test/daoc-server` for quick code updates (about 15 s).
+  - Run it (host or box): `<folder>/daoc-server.sh start` (or `start --console`); admin:
+    `<folder>/daoc-admin bots list` and so on.
 - **Ports:** game TCP 10300, UDP 10400. Only one server at a time. Check with
   `ss -ltnp | grep 10300` (on the host) before starting.
 
@@ -80,7 +77,6 @@ Inside the box, `~` is the box home, not `/home/deck`.
 
 - **Protect player data.** Never commit a played database, logs, backups, credentials,
   `serverconfig.xml` or `admins.json`. `.gitignore` is a safety net only.
-- **Don't touch `project/`** (`daoc-server-src`). It's the frozen reference.
 - **Keep the owner's gameplay rules:**
   - real loot, inventories, coins and equipment upgrades;
   - the Realm Exchange;
