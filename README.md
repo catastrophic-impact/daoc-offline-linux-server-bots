@@ -2,7 +2,8 @@
 
 A Linux-first, server-only DAoC server with autonomous and companion bots, based on a pinned
 OpenDAoC fork from Offline DAoC (synced to 0.35). It builds into one portable folder that needs no .NET
-install. The game client is not included; players install it separately.
+install. The game client is not included; players install it separately. I recommend the opendaoc client which can be found in OpenDAOC's documenation:
+https://www.opendaoc.com/ 
 
 This is based off of Shadowofze's work at: https://github.com/shadowofze/OfflineDAoC
 
