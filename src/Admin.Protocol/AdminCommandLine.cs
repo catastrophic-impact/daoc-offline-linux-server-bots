@@ -28,11 +28,17 @@ public static class AdminCommandLine
           accounts show <name>
           accounts create <name> <password>
           accounts set-role <name> player|gm|admin
+          options                         announcement, teleporter and siege switches
+          options set <key> <value>       on|off for switches, a number for the rest
+          goals                           bot goal percentages per level bracket
+          goals set <1-19|20-49|50> <solo> <group> <rvr> <battlegrounds>
+                                          percentages adding up to 100
+          rvr                             battlegrounds, keeps, relics and raids
         """;
 
     /// <summary>First words that the server console treats as admin commands.</summary>
     public static readonly IReadOnlySet<string> Groups =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "status", "server", "bots", "population", "accounts" };
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "status", "server", "bots", "population", "accounts", "options", "goals", "rvr" };
 
     public static AdminRequest Parse(IReadOnlyList<string> args)
     {
@@ -59,6 +65,11 @@ public static class AdminCommandLine
             ("accounts", "show") => Request(AdminOps.AccountsShow, ("name", Single(rest, "accounts show <name>"))),
             ("accounts", "create") => AccountsCreate(rest),
             ("accounts", "set-role") => AccountsSetRole(rest),
+            ("options", "" or "list") => Request(AdminOps.OptionsList),
+            ("options", "set") => OptionsSet(rest),
+            ("goals", "" or "show") => Request(AdminOps.GoalsGet),
+            ("goals", "set") => GoalsSet(rest),
+            ("rvr", "") => Request(AdminOps.RvrStatus),
             _ => throw new AdminUsageException($"Unknown command: {string.Join(' ', args)}\n\n{Usage}"),
         };
     }
@@ -135,6 +146,30 @@ public static class AdminCommandLine
         if (rest.Count != 2)
             throw new AdminUsageException("Usage: accounts set-role <name> player|gm|admin");
         return Request(AdminOps.AccountsSetRole, ("name", rest[0]), ("role", rest[1].ToLowerInvariant()));
+    }
+
+    private static AdminRequest OptionsSet(List<string> rest)
+    {
+        if (rest.Count != 2)
+            throw new AdminUsageException("Usage: options set <key> <value>");
+        return Request(AdminOps.OptionsSet, ("key", rest[0].ToLowerInvariant()), ("value", rest[1]));
+    }
+
+    public static readonly IReadOnlyList<string> GoalBrackets = ["1-19", "20-49", "50"];
+
+    private static AdminRequest GoalsSet(List<string> rest)
+    {
+        const string usage = "Usage: goals set <1-19|20-49|50> <solo> <group> <rvr> <battlegrounds>";
+        if (rest.Count != 5)
+            throw new AdminUsageException(usage);
+        if (!GoalBrackets.Contains(rest[0]))
+            throw new AdminUsageException($"Unknown level bracket '{rest[0]}'. {usage}");
+        return Request(AdminOps.GoalsSet,
+            ("bracket", rest[0]),
+            ("solo", ParseInt(rest[1], 0, 100, "solo")),
+            ("group", ParseInt(rest[2], 0, 100, "group")),
+            ("rvr", ParseInt(rest[3], 0, 100, "rvr")),
+            ("battlegrounds", ParseInt(rest[4], 0, 100, "battlegrounds")));
     }
 
     private static Dictionary<string, string?> Options(List<string> rest, string[] flags, string[] values)

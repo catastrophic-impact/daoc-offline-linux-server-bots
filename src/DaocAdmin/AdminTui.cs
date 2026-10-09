@@ -33,8 +33,17 @@ public sealed class AdminTui
     private readonly TableView _accounts = new() { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(2), FullRowSelect = true };
     private readonly Label _botSummary = new() { X = 0, Width = Dim.Fill() };
     private readonly Label _population = new() { X = 1, Y = 1, Width = Dim.Fill(), Height = 4 };
+    private readonly TableView _options = new() { X = 0, Y = 0, Width = Dim.Fill(), Height = 9, FullRowSelect = true };
+    private readonly Label _optionHelp = new() { X = 0, Y = 9, Width = Dim.Fill(), Height = 2 };
+    private readonly TableView _goals = new() { X = 0, Y = 13, Width = Dim.Fill(), Height = 6, FullRowSelect = true };
+    private readonly Label _goalsNote = new() { X = 0, Y = 19, Width = Dim.Fill(), Height = 2 };
+    private readonly TableView _battlegrounds = new() { X = 0, Y = 0, Width = Dim.Fill(), Height = 8, FullRowSelect = true };
+    private readonly TableView _objectives = new() { X = 0, Y = 9, Width = Dim.Fill(), Height = Dim.Fill(1), FullRowSelect = true };
+    private readonly Label _rvrNote = new() { X = 0, Width = Dim.Fill() };
     private List<BotInfo> _botRows = [];
     private List<AccountInfo> _accountRows = [];
+    private List<OptionInfo> _optionRows = [];
+    private List<GoalRow> _goalRows = [];
     private bool _connected;
 
     private AdminTui(string socketPath)
@@ -56,6 +65,7 @@ public sealed class AdminTui
             ApplyDarkTheme();
             tui.Build(Application.Top);
             tui.RefreshAll();
+            tui.RefreshSettings();
             tui.RefreshLog();
             Application.MainLoop.AddTimeout(RefreshInterval, _ => { tui.RefreshAll(); return true; });
             Application.MainLoop.AddTimeout(LogInterval, _ => { tui.RefreshLog(); return true; });
@@ -117,11 +127,13 @@ public sealed class AdminTui
         tabs.AddTab(new TabView.Tab("Bots", BotsTab()), false);
         tabs.AddTab(new TabView.Tab("Population", PopulationTab()), false);
         tabs.AddTab(new TabView.Tab("Accounts", AccountsTab()), false);
+        tabs.AddTab(new TabView.Tab("Options", OptionsTab()), false);
+        tabs.AddTab(new TabView.Tab("RvR", RvrTab()), false);
         window.Add(_header, tabs);
 
         var status = new StatusBar(
         [
-            new StatusItem(Key.F5, "~F5~ Refresh", RefreshAll),
+            new StatusItem(Key.F5, "~F5~ Refresh", () => { RefreshAll(); RefreshSettings(); }),
             new StatusItem(Key.CtrlMask | Key.Q, "~^Q~ Quit", Quit),
             new StatusItem(Key.Null, $"socket: {_client.SocketPath}", null),
         ]);
@@ -376,12 +388,150 @@ public sealed class AdminTui
         Application.Run(dialog);
     }
 
+    // ------------------------------------------------------------- Options
+
+    private View OptionsTab()
+    {
+        var view = new View { Width = Dim.Fill(), Height = Dim.Fill() };
+        var change = new Button("Change selected...") { X = 0, Y = 11 };
+        var editGoals = new Button("Edit goals...") { X = 0, Y = 21 };
+        change.Clicked += ChangeOptionDialog;
+        editGoals.Clicked += EditGoalsDialog;
+        _options.SelectedCellChanged += _ => _optionHelp.Text = Selected(_options, _optionRows)?.Description ?? "";
+        view.Add(_options, _optionHelp, change,
+            new Label("Bot goals: what share of bots in each level bracket picks each kind of goal.") { X = 0, Y = 12 },
+            _goals, _goalsNote, editGoals);
+        return view;
+    }
+
+    private void ChangeOptionDialog()
+    {
+        OptionInfo? option = Selected(_options, _optionRows);
+        if (option == null)
+            return;
+        if (option.Kind == "switch")
+        {
+            string next = option.Value == "on" ? "off" : "on";
+            if (MessageBox.Query(option.Key, $"{Wrap(option.Description)}\n\nTurn it {next}?", $"Turn {next}", "Cancel") == 0)
+                ApplyOption(option.Key, next);
+            return;
+        }
+
+        var value = new TextField(option.Value) { X = 10, Y = 4, Width = 10 };
+        var ok = new Button("Apply", is_default: true);
+        var cancel = new Button("Cancel");
+        var dialog = new Dialog(option.Key, 76, 10, ok, cancel);
+        dialog.Add(new Label(Wrap(option.Description)) { X = 1, Y = 1, Width = Dim.Fill(1), Height = 2 },
+            new Label("Value:") { X = 1, Y = 4 }, value, new Label($"default {option.Default}") { X = 22, Y = 4 });
+        cancel.Clicked += () => Application.RequestStop();
+        ok.Clicked += () =>
+        {
+            Application.RequestStop();
+            ApplyOption(option.Key, value.Text.ToString()!.Trim());
+        };
+        Application.Run(dialog);
+    }
+
+    private void ApplyOption(string key, string value)
+    {
+        Report(Execute(["options", "set", key, value], out string message), "Options", message);
+        RefreshSettings();
+    }
+
+    private void EditGoalsDialog()
+    {
+        GoalRow? row = Selected(_goals, _goalRows);
+        if (row == null)
+            return;
+        TextField Field(int value, int y) => new(value.ToString()) { X = 20, Y = y, Width = 5 };
+        var solo = Field(row.SoloPve, 3);
+        var group = Field(row.GroupPve, 4);
+        var rvr = Field(row.RvR, 5);
+        var battlegrounds = Field(row.Battlegrounds, 6);
+        var ok = new Button("Save", is_default: true);
+        var cancel = new Button("Cancel");
+        var dialog = new Dialog($"Bot goals, levels {row.Bracket}", 64, 13, ok, cancel);
+        dialog.Add(new Label("Percentages; they must add up to 100.") { X = 1, Y = 1 },
+            new Label("Solo PvE %:") { X = 1, Y = 3 }, solo,
+            new Label("Group PvE %:") { X = 1, Y = 4 }, group,
+            new Label("RvR %:") { X = 1, Y = 5 }, rvr, new Label("levels 20+") { X = 27, Y = 5 },
+            new Label("Battlegrounds %:") { X = 1, Y = 6 }, battlegrounds, new Label("levels 15-35, not level 50") { X = 27, Y = 6 },
+            new Label("Bots keep their current task until they pick a new goal.") { X = 1, Y = 8 });
+        cancel.Clicked += () => Application.RequestStop();
+        ok.Clicked += () =>
+        {
+            string[] args = ["goals", "set", row.Bracket, solo.Text.ToString()!.Trim(), group.Text.ToString()!.Trim(),
+                rvr.Text.ToString()!.Trim(), battlegrounds.Text.ToString()!.Trim()];
+            if (Execute(args, out string message))
+            {
+                Application.RequestStop();
+                RefreshSettings();
+            }
+            else
+            {
+                MessageBox.ErrorQuery("Could not save bot goals", Wrap(message), "OK");
+            }
+        };
+        Application.Run(dialog);
+    }
+
+    // ----------------------------------------------------------------- RvR
+
+    private View RvrTab()
+    {
+        var view = new View { Width = Dim.Fill(), Height = Dim.Fill() };
+        _rvrNote.Y = Pos.Bottom(_objectives);
+        view.Add(_battlegrounds, _objectives, _rvrNote);
+        return view;
+    }
+
     // ------------------------------------------------------------- Refresh
+
+    /// <summary>Options and goals change only through this screen, so they are not polled.</summary>
+    private void RefreshSettings()
+    {
+        try
+        {
+            _optionRows = AdminJson.To<List<OptionInfo>>(Call(AdminOps.OptionsList))!;
+            KeepSelection(_options, () => _options.Table = OptionTable(_optionRows));
+            _optionHelp.Text = Selected(_options, _optionRows)?.Description ?? "";
+
+            var goals = AdminJson.To<BotGoalsInfo>(Call(AdminOps.GoalsGet))!;
+            _goalRows = goals.Rows.ToList();
+            KeepSelection(_goals, () => _goals.Table = GoalTable(_goalRows));
+            _goalsNote.Text = (goals.Saved ? "Saved in bot-goals.json." : "Built-in defaults (no bot-goals.json yet).") +
+                              " Battlegrounds are for levels 15-35; RvR starts at 20.";
+        }
+        catch (AdminUnreachableException)
+        {
+            // The header already says the server is not running.
+        }
+        catch (AdminException exception)
+        {
+            _optionHelp.Text = $"Error: {exception.Message}";
+        }
+    }
+
+    private void RefreshRvr()
+    {
+        try
+        {
+            var rvr = AdminJson.To<RvrInfo>(Call(AdminOps.RvrStatus))!;
+            KeepSelection(_battlegrounds, () => _battlegrounds.Table = BattlegroundTable(rvr.Battlegrounds));
+            KeepSelection(_objectives, () => _objectives.Table = ObjectiveTable(rvr.Objectives));
+            _rvrNote.Text = $"As of {rvr.UpdatedUtc.ToLocalTime():HH:mm:ss} (the server refreshes this every 30 s).";
+        }
+        catch (AdminException exception)
+        {
+            _rvrNote.Text = exception.Message;
+        }
+    }
 
     private void RefreshAll()
     {
         try
         {
+            bool wasConnected = _connected;
             var status = AdminJson.To<ServerStatus>(Call(AdminOps.Status))!;
             _header.Text = $" {status.Name} ({status.Edition})  |  players {status.PlayersOnline}  |  bots {status.BotsOnline}/{status.BotRoster} in world  |  population {(status.PopulationEnabled ? "ON" : "OFF")}";
             _connected = true;
@@ -400,6 +550,10 @@ public sealed class AdminTui
 
             _accountRows = AdminJson.To<List<AccountInfo>>(Call(AdminOps.AccountsList))!;
             KeepSelection(_accounts, () => _accounts.Table = AccountTable(_accountRows));
+
+            if (!wasConnected)
+                RefreshSettings();
+            RefreshRvr();
         }
         catch (AdminUnreachableException)
         {
@@ -463,6 +617,47 @@ public sealed class AdminTui
         foreach (AccountInfo a in accounts)
             table.Rows.Add(a.Name, a.Role, a.Online ? "yes" : "", a.Characters,
                 a.LastLogin == default ? "never" : a.LastLogin.ToString("yyyy-MM-dd HH:mm"));
+        return table;
+    }
+
+    private static DataTable OptionTable(IEnumerable<OptionInfo> options)
+    {
+        var table = new DataTable();
+        foreach (string column in new[] { "Option", "Value", "Default" })
+            table.Columns.Add(column);
+        foreach (OptionInfo o in options)
+            table.Rows.Add(o.Key, o.Value, o.Default);
+        return table;
+    }
+
+    private static DataTable GoalTable(IEnumerable<GoalRow> rows)
+    {
+        var table = new DataTable();
+        foreach (string column in new[] { "Levels", "Solo PvE %", "Group PvE %", "RvR %", "Battlegrounds %" })
+            table.Columns.Add(column);
+        foreach (GoalRow r in rows)
+            table.Rows.Add(r.Bracket, r.SoloPve, r.GroupPve, r.RvR, r.Battlegrounds);
+        return table;
+    }
+
+    private static DataTable BattlegroundTable(IEnumerable<BattlegroundInfo> battlegrounds)
+    {
+        var table = new DataTable();
+        foreach (string column in new[] { "Battleground", "Levels", "Keep owner", "Inside A/M/H", "On the way A/M/H" })
+            table.Columns.Add(column);
+        foreach (BattlegroundInfo b in battlegrounds)
+            table.Rows.Add(b.Name, $"{b.MinLevel}-{b.MaxLevel}", b.Owner,
+                $"{b.AlbionInside}/{b.MidgardInside}/{b.HiberniaInside}", $"{b.AlbionTravelling}/{b.MidgardTravelling}/{b.HiberniaTravelling}");
+        return table;
+    }
+
+    private static DataTable ObjectiveTable(IEnumerable<RvrObjectiveInfo> objectives)
+    {
+        var table = new DataTable();
+        foreach (string column in new[] { "Kind", "Name", "Owner", "State", "Location" })
+            table.Columns.Add(column);
+        foreach (RvrObjectiveInfo o in objectives)
+            table.Rows.Add(o.Kind, o.Name, o.Owner, o.State, o.Location);
         return table;
     }
 

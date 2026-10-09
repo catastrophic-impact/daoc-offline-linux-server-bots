@@ -9,9 +9,9 @@ Requirements: x86-64 Linux with glibc 2.34 or newer (Ubuntu 22.04+, Debian 12+, 
 ## 1. Install navmeshes (once)
 
 Navmeshes let NPCs and bots walk around obstacles. The world itself is built in: a fresh
-Classic + Shrouded Isles world (the Offline DAoC 0.33 world) is created on first start.
+Classic + Shrouded Isles world (the Offline DAoC 0.35 world) is created on first start.
 
-Download `daoc-navmeshes-classic-si-2.tar.xz` (~340 MB) from the release page, put it next to the
+Download `daoc-navmeshes-classic-si-2.tar.xz` (~360 MB) from the release page, put it next to the
 server folder, and run:
 
 ```bash
@@ -46,6 +46,9 @@ The same actions also work as single commands:
 ./daoc-admin bots list
 ./daoc-admin population max 30                         # most bots in the world at once (0 = all)
 ./daoc-admin accounts set-role <account> admin         # or gm / player
+./daoc-admin options set bot_use_town_teleporters off  # announcements, teleporters, sieges: ./daoc-admin options
+./daoc-admin goals set 20-49 30 30 20 20               # bot goals: solo, group, RvR, battlegrounds %
+./daoc-admin rvr                                       # battlegrounds, keeps, relics and raids
 ./daoc-admin server stop                               # or: ./daoc-server.sh stop
 ./daoc-server.sh status
 ```

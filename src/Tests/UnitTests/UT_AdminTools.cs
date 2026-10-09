@@ -41,10 +41,43 @@ namespace DOL.Tests.Unit
         [TestCase("bots delete")]
         [TestCase("accounts set-role bob")]
         [TestCase("population max -1")]
+        [TestCase("options set rvr_siege_defense_ratio")]
+        [TestCase("goals set 20-49 40 40 20")]
+        [TestCase("goals set 15-19 50 50 0 0")]
+        [TestCase("goals set 50 20 40 40 101")]
         [TestCase("dance")]
         public void InvalidCommandsAreUsageErrorsNotCrashes(string line)
         {
             Assert.Throws<AdminUsageException>(() => Parse(line));
+        }
+
+        [Test]
+        public void OptionsSetLowercasesTheKeyAndKeepsTheValue()
+        {
+            AdminRequest request = Parse("options set BOT_USE_TOWN_TELEPORTERS off");
+            Assert.That(request.Op, Is.EqualTo(AdminOps.OptionsSet));
+            Assert.That(request.GetString("key"), Is.EqualTo("bot_use_town_teleporters"));
+            Assert.That(request.GetString("value"), Is.EqualTo("off"));
+        }
+
+        [Test]
+        public void GoalsSetParsesABracketAndFourPercentages()
+        {
+            AdminRequest request = Parse("goals set 20-49 30 30 20 20");
+            Assert.That(request.Op, Is.EqualTo(AdminOps.GoalsSet));
+            Assert.That(request.GetString("bracket"), Is.EqualTo("20-49"));
+            Assert.That(request.GetInt("solo"), Is.EqualTo(30));
+            Assert.That(request.GetInt("group"), Is.EqualTo(30));
+            Assert.That(request.GetInt("rvr"), Is.EqualTo(20));
+            Assert.That(request.GetInt("battlegrounds"), Is.EqualTo(20));
+        }
+
+        [TestCase("options", AdminOps.OptionsList)]
+        [TestCase("goals", AdminOps.GoalsGet)]
+        [TestCase("rvr", AdminOps.RvrStatus)]
+        public void ShowCommandsMapToTheirOps(string line, string op)
+        {
+            Assert.That(Parse(line).Op, Is.EqualTo(op));
         }
 
         [Test]

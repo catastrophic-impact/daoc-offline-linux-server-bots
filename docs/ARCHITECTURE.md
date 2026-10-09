@@ -9,7 +9,7 @@ A Dark Age of Camelot server for Linux, built on an OpenDAoC fork. It hosts play
 machine together with two kinds of bots, and ships as **one portable folder**: no .NET install,
 no Wine, no Docker. The game client is not part of the project; players install it separately.
 
-- **World:** Classic + Shrouded Isles (no Trials of Atlantis), the world of Offline DAoC 0.33.
+- **World:** Classic + Shrouded Isles (no Trials of Atlantis), the world of Offline DAoC 0.35.
 - **Classes:** the classic Classic + SI classes. The custom Sluaghbinder class exists in the code
   but is switched off (`classes / enable_sluaghbinder = False`), and it needs a patched client.
 - **Bots:** autonomous gamebots that live in the world, and companion bots that players summon.
@@ -19,11 +19,12 @@ no Wine, no Docker. The game client is not part of the project; players install 
 
 | Stage | What it was |
 |---|---|
-| **OpenDAoC** | Upstream emulator (ECS rewrite of DOLSharp). The exact fork point is unknown (no git history came with 0.33). |
+| **OpenDAoC** | Upstream emulator (ECS rewrite of DOLSharp). Offline DAoC's fork point from it is unknown. |
 | **Offline DAoC 0.33** (`source/` in the parent folder) | Windows single-player bundle with a WinForms launcher. It added the bots, the Realm Exchange, the Classic/SI world conversion and many gameplay fixes, changing about 720 upstream files. |
 | **`project/`** (`daoc-server-src`) | Linux conversion: portable release, admin socket with TUI/CLI, launcher removed, Linux fixes. It still imported the world from the 0.33 release. **Frozen reference: do not edit.** |
 | **`rewrite/`** (deleted) | An attempt to rebuild on unmodified upstream with bots as real `GamePlayer`s. It worked technically, but reaching parity meant rebuilding everything, so it was abandoned. Its world builder and navmesh packaging live on here. |
 | **This repo** (`next/` in the workspace) | `project/` plus: the world built from pinned upstream data (no 0.33 download), navmesh release packaging, fast bot logins, a dev loop. **This is where work happens.** |
+| **Offline DAoC 0.35 sync** (2026-10-09) | Upstream `source/server` code from its fork point `08ebffe` to v0.35, the 0.35 world (re-derived delta) and 0.35 navmeshes; launcher Options/Bot Goals/Battlegrounds as daoc-admin `options`, `goals`, `rvr`. See [UPSTREAM.md](../UPSTREAM.md). |
 
 Upgrading OpenDAoC is possible but means merging into a heavily modified fork. It's a deliberate
 project, not routine. See [UPSTREAM.md](../UPSTREAM.md).
@@ -84,7 +85,7 @@ project, not routine. See [UPSTREAM.md](../UPSTREAM.md).
 | Server settings | `ServerProperty` table | In game: `/serverproperty`. Bot settings are in category `autonomous_population`. |
 | Config | `config/serverconfig.xml`, `logconfig.xml`, `invalidnames.txt`, `admins.json` | Created from `defaults/`; never overwritten by upgrades. |
 | Bot tuning | `bin/bot-goals.json` (optional; defaults built in) | Goal mix per level band; read at startup. |
-| Navmeshes | `navmesh/zone*.nav` (99 files, about 2 GB) | Set `classic-si-2`; manifest `world/navmesh-manifest.sha256`. |
+| Navmeshes | `navmesh/zone*.nav` (103 files, about 2 GB) plus `seams.json` and `pockets.json` | Set `classic-si-2`; manifest `world/navmesh-manifest.sha256`. |
 
 **World pipeline** (`tools/build-release.sh`):
 1. `fetch-upstream-db.sh` downloads OpenDAoC-Database at the pinned commit and verifies a content
@@ -92,7 +93,7 @@ project, not routine. See [UPSTREAM.md](../UPSTREAM.md).
 2. `WorldBuilder` creates every table from the server's own DataObjects and loads the dump's
    rows.
 3. `world/patches/*.sql` run in name order:
-   - `200-*` is the generated 0.33 delta, which reproduces 0.33's pristine world exactly;
+   - `200-*` is the generated Offline DAoC delta, which reproduces 0.35's pristine world exactly;
    - `300-*` are hand-written changes (for example, faster bot logins).
 
 ## 6. Bots (summary)
@@ -115,7 +116,7 @@ The full guide is [BOTS-DEV.md](BOTS-DEV.md).
 - No Docker or Podman. No init-system integration; the server is a plain foreground process.
 - CLI first, TUI on top, no web UI. The admin socket is local only; remote admin goes over ssh.
 - Home network first; internet play is via router port forwarding (TCP 10300, UDP 10400).
-- Classic + SI only. The world is built from upstream data, with no 0.33 download.
+- Classic + SI only. The world is built from upstream data, with no Offline DAoC download.
 - Navmeshes ship in releases (default) and can be generated from a client (optional).
 - Bot AI is to become a separate, reloadable module, extracted step by step from the working code
   ([BOTS-DEV.md](BOTS-DEV.md), last section).

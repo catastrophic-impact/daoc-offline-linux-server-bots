@@ -51,11 +51,15 @@ On first start the folder creates:
 
 ## Admin
 
-The **admin screen** has four tabs:
+The **admin screen** has six tabs:
 - **Server:** status, live log, Stop.
 - **Bots:** list, create, delete.
 - **Population:** on/off, max in world.
 - **Accounts:** create, set player/GM/admin.
+- **Options:** announcement, town-teleporter, route-threat, Bring A Friend and siege switches, and
+  the bot goal percentages per level bracket (the Windows launcher's Options and Bot Goals).
+  Changes apply to the running server at once and are saved (server properties, `bot-goals.json`).
+- **RvR:** battlegrounds (bracket, keep owner, bots inside and on the way), keeps, relics, raids.
 
 The **CLI** (`./daoc-admin help`) has the same commands, and they also work typed into the
 server console:
@@ -67,6 +71,9 @@ bots create [--realm alb|mid|hib|all] [--count N] [--level 1|50] [--class NAME]
 bots delete <name|id> | bots delete-all --yes
 population | population on | off | max <N>
 accounts list | show <name> | create <name> <password> | set-role <name> player|gm|admin
+options | options set <key> on|off|<number>
+goals | goals set <1-19|20-49|50> <solo> <group> <rvr> <battlegrounds>
+rvr
 ```
 
 How it works:
@@ -101,6 +108,12 @@ forward **TCP 10300** and **UDP 10400** on your router.
 5. Start.
 
 `config/`, `data/` and `navmesh/` stay.
+
+**World changes don't reach an existing `data/`.** The world is copied into `data/` only on first
+start, so a release with new world data (the 0.35 sync: quests, spawns, server properties) needs a
+fresh `data/` to get it. There is no tool yet that carries characters and bots over into a new
+world (upstream's Windows `IMPORT PROGRESS` does this). Re-install the navmeshes too when the set
+name changes (`./navmesh-install.sh`).
 
 For code-only updates during development, `tools/dev-deploy.sh` does a quick version of this (see
 [BOTS-DEV.md](BOTS-DEV.md)).

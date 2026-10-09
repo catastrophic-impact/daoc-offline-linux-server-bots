@@ -74,6 +74,35 @@ public static class AdminText
                 var a = AdminJson.To<AccountInfo>(result)!;
                 return $"{a.Name}: {a.Role}{(a.Online ? ", online" : "")}, {a.Characters} character(s), created {Date(a.Created)}, last login {Date(a.LastLogin)}";
             }
+            case AdminOps.OptionsList:
+                return Table(["Option", "Value", "Default", "What it does"],
+                    AdminJson.To<List<OptionInfo>>(result)!.Select(o => new[] { o.Key, o.Value, o.Default, o.Description }));
+            case AdminOps.OptionsSet:
+            {
+                var o = AdminJson.To<OptionInfo>(result)!;
+                return $"{o.Key} = {o.Value}. Saved; it applies to the bots' next decisions.";
+            }
+            case AdminOps.GoalsGet:
+            case AdminOps.GoalsSet:
+            {
+                var g = AdminJson.To<BotGoalsInfo>(result)!;
+                string table = Table(["Levels", "Solo PvE %", "Group PvE %", "RvR %", "Battlegrounds %"],
+                    g.Rows.Select(r => new[] { r.Bracket, r.SoloPve.ToString(), r.GroupPve.ToString(), r.RvR.ToString(), r.Battlegrounds.ToString() }));
+                return $"{table}\n" + (op == AdminOps.GoalsSet
+                    ? "Saved. Bots use it for their next goal; a bot keeps its current task until then."
+                    : g.Saved ? "From bot-goals.json." : "Built-in defaults (no bot-goals.json yet).") +
+                    "\nBattlegrounds are for levels 15-35; RvR starts at 20.";
+            }
+            case AdminOps.RvrStatus:
+            {
+                var r = AdminJson.To<RvrInfo>(result)!;
+                string battlegrounds = Table(["Battleground", "Levels", "Keep owner", "Inside A/M/H", "On the way A/M/H"],
+                    r.Battlegrounds.Select(b => new[] { b.Name, $"{b.MinLevel}-{b.MaxLevel}", b.Owner,
+                        $"{b.AlbionInside}/{b.MidgardInside}/{b.HiberniaInside}", $"{b.AlbionTravelling}/{b.MidgardTravelling}/{b.HiberniaTravelling}" }));
+                string objectives = Table(["Kind", "Name", "Owner", "State", "Location"],
+                    r.Objectives.Select(o => new[] { o.Kind, o.Name, o.Owner, o.State, o.Location }));
+                return $"{battlegrounds}\n\n{objectives}\nAs of {r.UpdatedUtc.ToLocalTime():HH:mm:ss}.";
+            }
             default:
                 return result?.ToJsonString() ?? "OK";
         }

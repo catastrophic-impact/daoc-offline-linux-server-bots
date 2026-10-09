@@ -54,6 +54,16 @@ namespace DOL.GS.Admin
                     AdminOps.AccountsShow => ToInfo(FindAccount(Required(request, "name"))),
                     AdminOps.AccountsCreate => CreateAccount(Required(request, "name"), Required(request, "password")),
                     AdminOps.AccountsSetRole => SetRole(Required(request, "name"), Required(request, "role")),
+                    AdminOps.OptionsList => OptionsAdmin.List(),
+                    AdminOps.OptionsSet => OptionsAdmin.Set(Required(request, "key"), Required(request, "value")),
+                    AdminOps.GoalsGet => OptionsAdmin.Goals(),
+                    AdminOps.GoalsSet => OptionsAdmin.SetGoals(
+                        Required(request, "bracket"),
+                        request.GetInt("solo") ?? 0,
+                        request.GetInt("group") ?? 0,
+                        request.GetInt("rvr") ?? 0,
+                        request.GetInt("battlegrounds") ?? 0),
+                    AdminOps.RvrStatus => OptionsAdmin.Rvr(),
                     _ => throw new AdminException(AdminErrorCodes.Invalid, $"Unknown operation '{request.Op}'."),
                 };
                 return AdminResponse.Success(request.Id, result);
@@ -85,7 +95,7 @@ namespace DOL.GS.Admin
             return new ServerStatus(
                 GameServer.Instance.Configuration.ServerName,
                 typeof(GameServer).Assembly.GetName().Version?.ToString() ?? "unknown",
-                ServerProperties.Properties.ENABLE_SLUAGHBINDER ? "0.33b" : "0.33",
+                ServerProperties.Properties.ENABLE_SLUAGHBINDER ? "0.35b" : "0.35",
                 (long)(DateTime.Now - Process.GetCurrentProcess().StartTime).TotalSeconds,
                 HumanClients().Count(c => c.ClientState == GameClient.eClientState.Playing),
                 population.Online,

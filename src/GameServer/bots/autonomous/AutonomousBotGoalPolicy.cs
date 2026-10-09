@@ -24,6 +24,20 @@ public static class AutonomousBotGoalPolicy
         }
         Settings = BotGoalSettings.Load(path); // Reject corruption rather than silently ignoring 0% exclusions.
         IsConfigured = File.Exists(path);
+        FilePath = path;
+    }
+
+    public static string FilePath { get; private set; }
+
+    // daoc-admin edits goals while the server runs (the Windows launcher only while it is stopped).
+    // Every goal choice reads Settings, so new choices use the change; saved tasks are re-checked
+    // by ReconcileSavedAssignment at each bot's next login.
+    public static void Apply(BotGoalSettings settings)
+    {
+        string path = FilePath ?? throw new InvalidOperationException("Bot goals are not initialized.");
+        settings.Save(path, () => true);
+        Settings = settings;
+        IsConfigured = true;
     }
 
     public static eAutonomousObjectiveKind Choose(int level, Random random = null, bool excludeGroup = false,

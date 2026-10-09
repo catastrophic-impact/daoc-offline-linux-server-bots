@@ -24,6 +24,11 @@ public static class AdminOps
     public const string AccountsShow = "accounts.show";
     public const string AccountsCreate = "accounts.create";
     public const string AccountsSetRole = "accounts.setRole";
+    public const string OptionsList = "options.list";
+    public const string OptionsSet = "options.set";
+    public const string GoalsGet = "goals.get";
+    public const string GoalsSet = "goals.set";
+    public const string RvrStatus = "rvr.status";
 }
 
 public static class AdminErrorCodes
@@ -138,3 +143,30 @@ public sealed record AccountInfo(
     int Characters,
     DateTime Created,
     DateTime LastLogin);
+
+/// <summary>One server switch from the admin Options list (bool or number).</summary>
+public sealed record OptionInfo(string Key, string Kind, string Value, string Default, string Description);
+
+/// <summary>Bot goal percentages for one level bracket ("1-19", "20-49" or "50"); each row adds up to 100.</summary>
+public sealed record GoalRow(string Bracket, int SoloPve, int GroupPve, int RvR, int Battlegrounds);
+
+/// <summary>Saved is false while the server uses the built-in defaults (no bot-goals.json yet).</summary>
+public sealed record BotGoalsInfo(IReadOnlyList<GoalRow> Rows, bool Saved);
+
+public sealed record RvrObjectiveInfo(string Kind, string Name, string Owner, string State, string Location, string Forces);
+
+public sealed record BattlegroundInfo(
+    string Name,
+    int MinLevel,
+    int MaxLevel,
+    string CentralKeep,
+    string Owner,
+    int AlbionInside,
+    int MidgardInside,
+    int HiberniaInside,
+    int AlbionTravelling,
+    int MidgardTravelling,
+    int HiberniaTravelling);
+
+/// <summary>The server's RvR snapshot (refreshed every 30 s): keeps, relics, raids and battlegrounds.</summary>
+public sealed record RvrInfo(DateTime UpdatedUtc, IReadOnlyList<RvrObjectiveInfo> Objectives, IReadOnlyList<BattlegroundInfo> Battlegrounds);
