@@ -11,7 +11,7 @@ Requirements: x86-64 Linux with glibc 2.34 or newer (Ubuntu 22.04+, Debian 12+, 
 Navmeshes let NPCs and bots walk around obstacles. The world itself is built in: a fresh
 Classic + Shrouded Isles world (the Offline DAoC 0.33 world) is created on first start.
 
-Download `daoc-navmeshes-classic-si-1.tar.xz` (~340 MB) from the release page, put it next to the
+Download `daoc-navmeshes-classic-si-2.tar.xz` (~340 MB) from the release page, put it next to the
 server folder, and run:
 
 ```bash

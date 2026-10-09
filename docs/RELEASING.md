@@ -7,14 +7,14 @@
    version comes from `git describe`.
 3. Create a GitHub release and attach:
    - `dist/daoc-server-<version>-linux-x64.tar.gz` (server and world, ~85 MB);
-   - `dist/daoc-navmeshes-classic-si-1.tar.xz` and its `.sha256` (~340 MB), for people who use the
+   - `dist/daoc-navmeshes-classic-si-2.tar.xz` and its `.sha256` (~340 MB), for people who use the
      release instead of building from source. Upload it once per navmesh set: attach it to every
-     release, or keep a dedicated `navmeshes-classic-si-1` release and link to it.
+     release, or keep a dedicated `navmeshes-classic-si-2` release and link to it.
 
    People building from source don't need this; the navmeshes are in the source
    (`world/navmesh/`).
 4. Put the navmesh download URL in `deploy/release.conf`
-   (`NAVMESH_URL=https://github.com/catastrophic-impact/daoc-offline-linux-server-bots/releases/download/<tag>/daoc-navmeshes-classic-si-1.tar.xz`),
+   (`NAVMESH_URL=https://github.com/catastrophic-impact/daoc-offline-linux-server-bots/releases/download/<tag>/daoc-navmeshes-classic-si-2.tar.xz`),
    commit, and rebuild. `./navmesh-install.sh` with no arguments then downloads it automatically
    when the archive isn't next to the folder.
 
@@ -27,13 +27,13 @@ Never attach or commit a played database, logs, `serverconfig.xml` or `admins.js
 tools/package-navmeshes.sh <folder with zone*.nav>   # verifies against world/navmesh-manifest.sha256
 ```
 
-It writes `dist/daoc-navmeshes-classic-si-1.tar.xz` and a `.sha256` (xz, about 4 minutes on a
+It writes `dist/daoc-navmeshes-classic-si-2.tar.xz` and a `.sha256` (xz, about 4 minutes on a
 Steam Deck), plus the same archive as ~90 MB parts in `world/navmesh/`. Those parts are what the
 source carries: each is under GitHub's 100 MB file limit, so plain git works without LFS. The current set is the 99 meshes shipped with Offline DAoC 0.33. A source copy on
 this machine is `~/boxes/daoc-server-box-home/daoc-server/navmesh`.
 
 **A new navmesh set** (for example, regenerated with `tools/navmesh`):
-1. Bump the set name `classic-si-1` in `tools/package-navmeshes.sh` and
+1. Bump the set name `classic-si-2` in `tools/package-navmeshes.sh` and
    `deploy/navmesh-install.sh`.
 2. Regenerate the manifest:
    `(cd <folder> && sha256sum zone*.nav | sort -k2) > world/navmesh-manifest.sha256`

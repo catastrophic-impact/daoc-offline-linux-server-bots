@@ -92,7 +92,7 @@ Do this inside the build box (`distrobox enter daoc-server-box`), where the .NET
    ```bash
    cd /path/to/repo && tools/build-release.sh          # on this Deck: /home/deck/Dev/vscode/OfflineDAoC-main/next
    mkdir -p ~/next-test && tar -xzf dist/daoc-server-*-linux-x64.tar.gz -C ~/next-test
-   cp dist/daoc-navmeshes-classic-si-1.tar.xz* ~/next-test/ && ~/next-test/daoc-server/navmesh-install.sh
+   cp dist/daoc-navmeshes-classic-si-2.tar.xz* ~/next-test/ && ~/next-test/daoc-server/navmesh-install.sh
    ```
    On this Steam Deck that folder already exists: `~/boxes/daoc-server-box-home/next-test/daoc-server`.
 2. **Edit** code under `src/GameServer/bots/`.

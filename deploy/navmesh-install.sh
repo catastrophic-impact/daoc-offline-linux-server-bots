@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# navmesh-install.sh - install the navigation meshes (zone*.nav) into this server folder's navmesh/.
+# navmesh-install.sh - install the navigation meshes (zone*.nav, plus the bots' seams.json and
+# pockets.json zone data) into this server folder's navmesh/.
 # NPCs and bots need them to path around obstacles; without them they walk in straight lines.
 #
 #   ./navmesh-install.sh                         default: the navmesh archive from this project's release
@@ -13,9 +14,9 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="${DAOC_HOME:-$HERE}/navmesh"
-SET="classic-si-1"
+SET="classic-si-2"
 ARCHIVE_NAME="daoc-navmeshes-$SET.tar.xz"
-# Set when the project is published, or override: NAVMESH_URL=https://.../daoc-navmeshes-classic-si-1.tar.xz
+# Set when the project is published, or override: NAVMESH_URL=https://.../daoc-navmeshes-classic-si-2.tar.xz
 work=""
 NAVMESH_URL="${NAVMESH_URL:-$(sed -n 's/^NAVMESH_URL=//p' "$HERE/release.conf" 2>/dev/null)}"
 die() { echo "navmesh-install: $*" >&2; exit 1; }
@@ -34,6 +35,8 @@ install_archive() {
   (cd "$work/navmesh" && grep -v '^#' MANIFEST.sha256 | sha256sum --check --quiet) || die "navmeshes failed verification"
   mkdir -p "$DEST"
   mv -f "$work"/navmesh/zone*.nav "$DEST/"
+  # Bot zone-border and walled-pocket data, built from these meshes (set classic-si-2 and later).
+  for f in seams.json pockets.json; do if [[ -f $work/navmesh/$f ]]; then mv -f "$work/navmesh/$f" "$DEST/"; fi; done
   cp "$work/navmesh/MANIFEST.sha256" "$DEST/"
   echo "Installed $(ls "$DEST"/zone*.nav | wc -l) navmeshes into $DEST"
 }
@@ -64,6 +67,7 @@ case "${1:-}" in
       cp -f "$f" "$DEST/"
       count=$((count + 1))
     done
+    for f in seams.json pockets.json; do if [[ -f $src/$f ]]; then cp -f "$src/$f" "$DEST/"; fi; done
     echo "Installed $count navmeshes into $DEST"
     ;;
   --build-from-client)

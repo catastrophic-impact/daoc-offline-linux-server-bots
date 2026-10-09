@@ -74,7 +74,7 @@ echo "$VERSION" > "$OUT/VERSION"
 # Navmeshes ship in the source as ~90 MB parts (world/navmesh/; under GitHub's 100 MB file limit).
 # Join and verify them, and install them into the folder so dist/daoc-server is ready to start.
 echo "== Navmeshes (world/navmesh)"
-navset="daoc-navmeshes-classic-si-1.tar.xz"
+navset="daoc-navmeshes-classic-si-2.tar.xz"
 nav="$REPO/dist/$navset"
 want=$(<"$REPO/world/navmesh/$navset.sha256")
 if [[ ! -f $nav || $(sha256sum "$nav" | cut -d' ' -f1) != "$want" ]]; then

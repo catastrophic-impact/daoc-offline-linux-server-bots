@@ -7,7 +7,7 @@ publish it, see [RELEASING.md](RELEASING.md).
 ```
 dist/daoc-server/                              portable server folder, ready to start (world and navmeshes installed)
 dist/daoc-server-<version>-linux-x64.tar.gz    the folder without navmeshes, as one archive (~85 MB)
-dist/daoc-navmeshes-classic-si-1.tar.xz        the navmeshes (~340 MB), joined from world/navmesh/ parts
+dist/daoc-navmeshes-classic-si-2.tar.xz        the navmeshes (~340 MB), joined from world/navmesh/ parts
 ```
 
 No client files are included.
@@ -52,7 +52,7 @@ Then run `tools/build-release.sh`. The result needs your system's glibc version 
    - the result is `defaults/world.sqlite`.
 4. Copies translations, default config, scripts (`daoc-server.sh`, `daoc-admin`,
    `navmesh-install.sh`, `release.conf`) and the README into the folder.
-5. **Navmeshes:** joins `world/navmesh/*.part-*` into `dist/daoc-navmeshes-classic-si-1.tar.xz`,
+5. **Navmeshes:** joins `world/navmesh/*.part-*` into `dist/daoc-navmeshes-classic-si-2.tar.xz`,
    verifies it against the committed `.sha256`, and installs it into `dist/daoc-server/navmesh`.
 6. Writes `VERSION` (`git describe`, or `dev` without git) and the tarball, which excludes
    `navmesh/`.

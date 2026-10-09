@@ -55,7 +55,7 @@ Install the **.NET 10 SDK**, **cmake**, **g++** and **curl** with your package m
 ```
 dist/daoc-server/                              <- the server, ready to start (world and navmeshes installed)
 dist/daoc-server-<version>-linux-x64.tar.gz    <- the server without navmeshes, as one file
-dist/daoc-navmeshes-classic-si-1.tar.xz        <- the navmeshes, as one file
+dist/daoc-navmeshes-classic-si-2.tar.xz        <- the navmeshes, as one file
 ```
 
 To run it on another Linux machine, copy `dist/daoc-server` (or the two archives, then run

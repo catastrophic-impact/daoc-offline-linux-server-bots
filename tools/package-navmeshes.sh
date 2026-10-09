@@ -10,7 +10,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$REPO/world/navmesh-manifest.sha256"
-SET="classic-si-1"
+SET="classic-si-2"
 SRC=${1:?"usage: $0 <folder with zone*.nav>"}
 OUT="$REPO/dist/daoc-navmeshes-$SET.tar.xz"
 

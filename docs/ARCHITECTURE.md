@@ -84,7 +84,7 @@ project, not routine. See [UPSTREAM.md](../UPSTREAM.md).
 | Server settings | `ServerProperty` table | In game: `/serverproperty`. Bot settings are in category `autonomous_population`. |
 | Config | `config/serverconfig.xml`, `logconfig.xml`, `invalidnames.txt`, `admins.json` | Created from `defaults/`; never overwritten by upgrades. |
 | Bot tuning | `bin/bot-goals.json` (optional; defaults built in) | Goal mix per level band; read at startup. |
-| Navmeshes | `navmesh/zone*.nav` (99 files, about 2 GB) | Set `classic-si-1`; manifest `world/navmesh-manifest.sha256`. |
+| Navmeshes | `navmesh/zone*.nav` (99 files, about 2 GB) | Set `classic-si-2`; manifest `world/navmesh-manifest.sha256`. |
 
 **World pipeline** (`tools/build-release.sh`):
 1. `fetch-upstream-db.sh` downloads OpenDAoC-Database at the pinned commit and verifies a content
