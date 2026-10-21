@@ -22,21 +22,30 @@ No client code, launcher or release tooling from upstream is imported. Ever.
   `AdminHost.Register()` before the server is created, and `LoginRequestHandler.NewAccountPrivLevelProvider`
   is a hook that `AdminHost.Register()` fills in. Nothing else in GameServer knows the admin module exists.
 
-## Pulling from Offline DAoC
+## Pulling from Offline DAoC (the quick way, since 0.37)
+
+Each release now ships a small game patch (`OfflineDAoC-v<ver>-game-patch.zip`, ~40 MB, attached to the
+`v<ver>b` release) with the world-DB delta and the changed navmesh files. We use it for data, and git tags
+for code. In the build box:
 
 ```bash
-tools/upstream/sync.sh offlinedaoc report v0.37     # files that changed, with our paths
-tools/upstream/sync.sh offlinedaoc check  v0.37     # do the patches apply cleanly?
-git switch -c sync-0.37
-tools/upstream/sync.sh offlinedaoc apply  v0.37     # needs a clean tree; leaves .rej files on conflict
+tools/upstream/sync.sh offlinedaoc report v0.38     # code: what changed, with our paths
+git switch -c sync-0.38
+tools/upstream/sync.sh offlinedaoc apply  v0.38     # code; needs a clean tree
+tools/upstream/update-data.sh 0.38                  # world patch 2NN-offline-0.38.sql + navmesh, both verified
+tools/build-release.sh                              # then run the tests and a startup (error counts: docs/history)
 ```
 
-`apply` takes `--bots` (only `src/Bots`) or `--core` (only the rest). Bot logic is the part that
-changes most upstream and that we edit least, so a bots-only sync is the common, safe case.
+`apply` patches cleanly where it can. For files we edited, it falls back to a 3-way merge (base = upstream at the
+synced sha) and lists them for review; real conflicts are left as `<<<<<<<` markers. `update-data.sh` fails, and
+writes nothing, if the release's idea of the old world differs from ours (a skipped release, or a hand-edited row).
 
-Then: build and test (docs/BUILD.md), resolve `.rej` files, run `bot-touchpoints.sh` against the
-changed files, update `UPSTREAM.md`, `offlinedaoc_SYNCED` in `tools/upstream/upstreams.conf` and
-`AdminService.OfflineDaocVersion` (the version the TUI shows), all in the same commit. Upstream tags can share a commit (v0.36, v0.36b and v0.36c are one), so record the sha.
+Finish by updating `UPSTREAM.md`, `offlinedaoc_SYNCED` in `tools/upstream/upstreams.conf` and
+`AdminService.OfflineDaocVersion` (the version the TUI shows), all in the same commit. Upstream tags can share a
+commit (v0.36 and v0.37 each were one), so record the sha.
+
+`apply` takes `--bots` (only `src/Bots`) or `--core` (only the rest). Bot logic changes most upstream and we edit it
+least, so a bots-only sync is the safe case.
 
 Conflicts in `src/Bots` mean we edited upstream bot code. Prefer moving our change out into a new
 file in `src/Bots/` (a policy class, a partial) so the upstream file can be replaced as-is.
