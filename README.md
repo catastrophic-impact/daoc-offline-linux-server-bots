@@ -1,7 +1,7 @@
 # DAoC Server
 
 A Linux-first, server-only DAoC server with autonomous and companion bots, based on a pinned
-OpenDAoC fork from Offline DAoC (synced to 0.36). It builds into one portable folder that needs no .NET
+OpenDAoC fork from Offline DAoC (synced to 0.37). It builds into one portable folder that needs no .NET
 install. The game client is not included; players install it separately. I recommend the opendaoc client which can be found in OpenDAOC's documenation:
 https://www.opendaoc.com/ 
 
@@ -113,7 +113,7 @@ Accounts are created on first login. To make yours an admin, go to the **Account
 
 ## What's in the game
 
-- **World:** Classic + Shrouded Isles (the Offline DAoC 0.36 world), with Darkness Falls, the
+- **World:** Classic + Shrouded Isles (the Offline DAoC 0.37 world), with Darkness Falls, the
   Realm Exchange and stablemaster routes.
 - **Autonomous bots:** persistent characters that level, hunt, travel, group, raid and fight in
   RvR on their own. Manage them in the admin screen's Bots and Population tabs.
