@@ -36,10 +36,12 @@ public static class AutonomousTownTeleporters
     public const double MinimumSavingSeconds = 60;
     public const double MinimumSavingFraction = 0.30;
 
-    public sealed record Plan(GameNPC Porter, DbTeleport Destination, double Seconds, double BaselineSeconds);
+    /// <param name="Walk">The priced walk to the porter (route length, at least the straight line).</param>
+    public sealed record Plan(GameNPC Porter, DbTeleport Destination, double Seconds, double BaselineSeconds, float Walk = 0);
 
     /// <summary>How far from the teleporter NPC a bot stops to use it (inside ArrivalRadius).</summary>
     public const int StandOffDistance = 170;
+    public const float BindstoneClearance = 150;
 
     /// <summary>
     /// Where a bot stops to use a teleporter: a short way out from the NPC on the side it comes from, spread a little
@@ -78,6 +80,9 @@ public static class AutonomousTownTeleporters
         var seen = new List<Vector3>();
         bool Fresh(Vector3 p)
         {
+            // Owner report 2026-10-16: at Mularn the bindstone stands 168 units from Stor Gothi Annark, so the stand-off
+            // on the bindstone side put bots inside the stone (its collision is a client object, not navmesh).
+            if (BotReleaseBindPoints.IsNearBindstone(porter.CurrentRegionID, p.X, p.Y, p.Z, BindstoneClearance)) return false;
             if (seen.Any(s => Vector2.DistanceSquared(new(s.X, s.Y), new(p.X, p.Y)) < 40 * 40)) return false;
             seen.Add(p);
             return true;
@@ -143,7 +148,7 @@ public static class AutonomousTownTeleporters
             : Destinations(bot.Realm).Where(destination => destination.RegionID == goalRegion).ToArray();
         if (destinations.Length == 0) return null;
         Vector3 actor = new(bot.X, bot.Y, bot.Z);
-        Plan best = null;
+        var options = new List<(GameNPC Porter, DbTeleport Destination, float ToPorter, double Remaining)>();
         foreach (GameNPC porter in Porters(bot.CurrentRegion))
         {
             if (porter.Realm != bot.Realm || excluded != null && excluded.TryGetValue(porter, out long until) && now < until)
@@ -155,16 +160,64 @@ public static class AutonomousTownTeleporters
                 if (destination.RegionID == porter.CurrentRegionID &&
                     Vector2.Distance(new(destination.X, destination.Y), new(porter.X, porter.Y)) < SameTownRadius)
                     continue;
-                double seconds = toPorter / speed + ChannelSeconds +
-                                 Vector2.Distance(new(destination.X, destination.Y), new(goal.X, goal.Y)) / speed;
-                if (best == null || seconds < best.Seconds)
-                    best = new(porter, destination, seconds, baselineSeconds);
+                options.Add((porter, destination, toPorter, ChannelSeconds +
+                    Vector2.Distance(new(destination.X, destination.Y), new(goal.X, goal.Y)) / speed));
             }
+        }
+        // The walk to the teleporter is priced by its real route for the cheapest few options: a porter 12,000 units
+        // away in a straight line can be a 40,000-unit walk around a ridge (the owner's 2026-10-17 session: 342 of 381
+        // failed trips never came within 2,000 units of their teleporter; one bot ended 34,000 away after 5 minutes).
+        Plan best = null;
+        var walked = new Dictionary<GameNPC, float>();
+        foreach (var option in options.OrderBy(o => o.ToPorter / speed + o.Remaining).Take(RoutePricedOptions))
+        {
+            if (!walked.TryGetValue(option.Porter, out float walk))
+                walked[option.Porter] = walk = WalkToPorter(bot, actor, option.Porter, option.ToPorter);
+            double seconds = walk / speed + option.Remaining;
+            if (best == null || seconds < best.Seconds)
+                best = new(option.Porter, option.Destination, seconds, baselineSeconds, walk);
         }
         if (best == null || best.Seconds + MinimumSavingSeconds > baselineSeconds ||
             best.Seconds > baselineSeconds * (1 - MinimumSavingFraction))
             return null;
         return best;
+    }
+
+    public const int RoutePricedOptions = 3;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(GameNPC Porter, int X, int Y), (float Length, long Until)>
+        WalkLengths = new();
+
+    /// <summary>
+    /// The walking length from <paramref name="actor"/> to the porter: the road network's proven route inside the
+    /// zone (AutonomousZoneRoads), remembered per 1,024-unit area for ten minutes; the straight line where the
+    /// zone has no road data, the porter stands in another zone, or no road route joins them.
+    /// </summary>
+    public static float WalkToPorter(GameBot bot, Vector3 actor, GameNPC porter, float straight)
+    {
+        Zone zone = bot.CurrentZone;
+        if (zone == null || porter.CurrentZone != zone || !AutonomousZoneRoads.Covers(zone)) return straight;
+        long now = GameLoop.GameLoopTime;
+        var key = (porter, (int)actor.X >> 10, (int)actor.Y >> 10);
+        if (WalkLengths.TryGetValue(key, out var known) && now < known.Until) return known.Length;
+        float length = straight;
+        Vector3 target = new(porter.X, porter.Y, porter.Z);
+        if (AutonomousZoneRoads.TryRoute(PathfindingProvider.Instance, zone, actor, target, out Vector3[] via) && via is { Length: > 0 })
+            length = RouteLength(actor, via, target);
+        if (WalkLengths.Count > 16_384) WalkLengths.Clear();
+        WalkLengths[key] = (Math.Max(straight, length), now + 10 * 60_000);
+        return Math.Max(straight, length);
+    }
+
+    public static float RouteLength(Vector3 start, IReadOnlyList<Vector3> via, Vector3 end)
+    {
+        float length = 0;
+        Vector3 from = start;
+        foreach (Vector3 point in via)
+        {
+            length += Vector2.Distance(new(from.X, from.Y), new(point.X, point.Y));
+            from = point;
+        }
+        return length + Vector2.Distance(new(from.X, from.Y), new(end.X, end.Y));
     }
 
     /// <summary>

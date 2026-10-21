@@ -58,7 +58,12 @@ namespace DOL.GS
                 _rvrDestination = null;
             }
             _rvrSharedEvent = false;
-            _rvrIntent = assault ? AutonomousRvrEventLayer.Intent.AssaultKeep : AutonomousRvrEventLayer.Intent.Roam;
+            // Too few of the realm here for a wave: fight in the field instead of standing at the staging point or
+            // feeding single bots to the keep's guards (Thidranki, 2026-10-17).
+            bool tooFew = assault && AutonomousBattlegroundWave.TooFewForAssault(bot.Realm, bracket);
+            _rvrIntent = assault && !tooFew ? AutonomousRvrEventLayer.Intent.AssaultKeep : AutonomousRvrEventLayer.Intent.Roam;
+            if (tooFew)
+                return RoamBattleground(bot, bracket, central);
 
             if (assault)
             {
@@ -89,12 +94,78 @@ namespace DOL.GS
                         $"{central.Name} is held by {Holder(central)}", target.Name);
                     return false;
                 }
+                // At the keep the assault goes for the lord. Run 17 (2026-10-17): in all four battlegrounds the gates fell and
+                // guards died for four hours while every lord stayed at 100% with no bot beside him; the assault walked to the
+                // keep's centre and only took targets in reach there, and the lord stands upstairs. A closed gate on the way
+                // is battered above (FindReachableEnemyDoor) as soon as the bot stands at it.
+                GameKeepGuard lord = central.Guards.Values.FirstOrDefault(guard => guard is GuardLord && guard.IsAlive);
+                if (lord != null && lord.CurrentRegionID == bot.CurrentRegionID && bot.IsWithinRadius(lord, BattlegroundLordReach))
+                {
+                    if (bot.IsWithinRadius(lord, BattlegroundLordStrike) && GameServer.ServerRules.IsAllowedToAttack(bot, lord, true))
+                    {
+                        bot.StopMovingOnPath();
+                        bot.StopMoving();
+                        bot.TargetObject = lord;
+                        brain.AddToAggroList(lord, Math.Max(100, lord.EffectiveLevel * 12));
+                        brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
+                        SetBattlegroundStatus(bot, bracket, "Assaulting the keep lord", $"{central.Name} is held by {Holder(central)}", lord.Name);
+                        return false;
+                    }
+                    // In through a broken main gate, as players went: run 19 (2026-10-17) showed the stormers standing at a
+                    // closed postern (never batterable) because the shortest path to the lord runs through it.
+                    Vector3 here = new(bot.X, bot.Y, bot.Z);
+                    if (_battlegroundGateKeep != central.KeepID || !bot.IsWithinRadius(lord, BattlegroundLordReach))
+                    {
+                        _battlegroundGateKeep = central.KeepID;
+                        _battlegroundGatePassed = false;
+                    }
+                    GameKeepDoor gate = central.Doors.Values
+                        .Where(door => door.IsAttackableDoor && !door.IsPostern && (!door.IsAlive || door.State == eDoorState.Open))
+                        .OrderBy(door => bot.GetDistanceTo(door)).FirstOrDefault();
+                    // Every main gate still shut: march on the nearest one and batter it (FindReachableEnemyDoor above
+                    // takes it once in reach). Pathing to the lord through the closed keep found no path: 90 stormers of
+                    // Dun Abermenai gave up their route that way in run 21 (2026-10-17).
+                    if (gate == null && ClosedMainGate(bot, central) is { } shut)
+                    {
+                        // Each storm step turns the bot at once (a moving bot otherwise finished its previous walk first).
+                        if (IssuePath(bot, new Vector3(shut.X, shut.Y, shut.Z), retargetWhileMoving: true))
+                        {
+                            TraceStorm(this, bot, central, lord, shut, "closed-gate");
+                            SetBattlegroundStatus(bot, bracket, "Marching on the keep gate", $"{central.Name}: the gates are shut", shut.Name);
+                            return true;
+                        }
+                    }
+                    if (gate != null && !_battlegroundGatePassed)
+                    {
+                        if (bot.IsWithinRadius(gate, BattlegroundGateReached))
+                            _battlegroundGatePassed = true;
+                        else if (IssuePath(bot, new Vector3(gate.X, gate.Y, gate.Z), retargetWhileMoving: true))
+                        {
+                            TraceStorm(this, bot, central, lord, gate, "gate");
+                            SetBattlegroundStatus(bot, bracket, "Storming the keep", $"{central.Name}: through the broken gate", lord.Name);
+                            return true;
+                        }
+                        else TraceStorm(this, bot, central, lord, gate, "gate-path-refused");
+                    }
+                    if (IssuePath(bot, new Vector3(lord.X, lord.Y, lord.Z), retargetWhileMoving: true))
+                    {
+                        TraceStorm(this, bot, central, lord, gate, "lord");
+                        SetBattlegroundStatus(bot, bracket, "Storming the keep", $"{central.Name}: heading for {lord.Name}", lord.Name);
+                        return true;
+                    }
+                    TraceStorm(this, bot, central, lord, gate, "lord-path-refused");
+                }
                 if (FollowKeepTravel(bot, _rvrDestination))
                 {
                     SetBattlegroundStatus(bot, bracket, $"Marching on {central.Name}", $"{Holder(central)} holds the central keep");
                     return true;
                 }
-                Vector3 approach = _rvrApproachDestination ?? new(central.X, central.Y, central.Z);
+                // With every main gate shut the keep's centre has no path (209 route give-ups in Abermenai, run 21): the
+                // approach is then the nearest main gate.
+                Vector3 approach = _rvrApproachDestination ?? (ClosedMainGate(bot, central) is { } closedGate &&
+                    !central.Doors.Values.Any(door => door.IsAttackableDoor && !door.IsPostern && (!door.IsAlive || door.State == eDoorState.Open))
+                        ? new Vector3(closedGate.X, closedGate.Y, closedGate.Z)
+                        : new Vector3(central.X, central.Y, central.Z));
                 if (Vector3.DistanceSquared(new(bot.X, bot.Y, bot.Z), approach) > 120 * 120)
                     IssuePath(bot, approach);
                 else
@@ -150,8 +221,44 @@ namespace DOL.GS
             return true;
         }
 
+        // Stormers stop 1,600-2,500 from the lord with the gates down (runs 18-21), though the mesh reaches him from the
+        // gates (navmesh probe 2026-10-17). One line every 20 s server-wide says where a stormer stands and what it walks to.
+        private static long _nextStormTraceTick;
+        private static void TraceStorm(AutonomousWorldBotController controller, GameBot bot, AbstractGameKeep keep, GameKeepGuard lord,
+            GameKeepDoor gate, string step)
+        {
+            long now = GameLoop.GameLoopTime;
+            long next = System.Threading.Interlocked.Read(ref _nextStormTraceTick);
+            if (now < next || System.Threading.Interlocked.CompareExchange(ref _nextStormTraceTick, now + 20_000, next) != next)
+                return;
+            var mover = bot.movementComponent;
+            Log.Info($"BG_STORM_TRACE bot={bot.Name} keep=\"{keep.Name}\" step={step} at={bot.X},{bot.Y},{bot.Z} " +
+                     $"toLord={(int)bot.GetDistanceTo(lord)} lordAt={lord.X},{lord.Y},{lord.Z} " +
+                     $"gate={(gate == null ? "none" : $"{gate.DoorId}@{gate.X},{gate.Y},{gate.Z} alive={gate.IsAlive} state={gate.State} toGate={(int)bot.GetDistanceTo(gate)}")} " +
+                     $"moving={bot.IsMoving} path={mover?.LastPathfindingStatus} dest={(mover == null ? "-" : $"{mover.Destination.X:0},{mover.Destination.Y:0},{mover.Destination.Z:0}")} " +
+                     $"inCombat={bot.InCombat} target={bot.TargetObject?.Name} " +
+                     // Why a stormer stands between turns (run 22: 55% of the samples at the gate step stood 3,300 from it).
+                     $"issued={Format(controller._issuedRouteDestination)} recovery={Format(controller._routeRecoveryWaypoint)} " +
+                     $"orderIn={Math.Max(0, controller._nextMoveOrderTick - now)} stallReplans={controller._routeStallReplans}");
+
+            static string Format(Vector3? point) => point is { } p ? $"{p.X:0},{p.Y:0},{p.Z:0}" : "-";
+        }
+
+        public const int BattlegroundLordReach = 4_000;
+        public const int BattlegroundGateReached = 250;
+        private int _battlegroundGateKeep;
+        private bool _battlegroundGatePassed;
+        public const int BattlegroundLordStrike = 900;
+
         private static string Holder(AbstractGameKeep keep) =>
             keep.Realm == eRealm.None ? "its neutral guards" : GlobalConstants.RealmToName(keep.Realm);
+
+        /// <summary>The nearest standing, closed main gate (not a postern) of the keep.</summary>
+        private static GameKeepDoor ClosedMainGate(GameBot bot, AbstractGameKeep keep) =>
+            keep?.Doors.Values
+                .Where(door => door.IsAlive && door.IsAttackableDoor && !door.IsPostern && door.State == eDoorState.Closed)
+                .OrderBy(bot.GetDistanceTo)
+                .FirstOrDefault();
 
         /// <summary>A closed gate of the enemy-held keep that this bot can stand at and hit, like players did.</summary>
         private static GameKeepDoor FindReachableEnemyDoor(GameBot bot, AbstractGameKeep keep)

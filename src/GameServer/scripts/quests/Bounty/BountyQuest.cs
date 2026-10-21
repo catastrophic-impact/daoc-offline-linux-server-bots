@@ -220,10 +220,12 @@ namespace DOL.GS.Quests
 
         public override void Notify(DOLEvent e, object sender, EventArgs args)
         {
+            // Any monster with the bounty target's name counts, whatever its level or where it stands (owner
+            // 2026-10-17: "if I have that bounty any of them should count if the name matches"). The difficulty still
+            // decides the target and the number of kills.
             if (e == GameLivingEvent.EnemyKilled && sender == m_questPlayer &&
                 args is EnemyKilledEventArgs killed && killed.Target is GameNPC npc && Step == 1 &&
-                Target?.Matches(npc) == true && Goals.Count > 0 &&
-                BountyDifficultyRules.KillCounts(Difficulty, Target.Level, npc.Level))
+                CountsForBounty(Target, npc) && Goals.Count > 0)
             {
                 Goals[0].Advance();
                 if (Goals[0].IsAchieved)
@@ -237,6 +239,11 @@ namespace DOL.GS.Quests
 
             base.Notify(e, sender, args);
         }
+
+        /// <summary>A kill counts for the bounty when the monster has the target's name (any level, anywhere).</summary>
+        public static bool CountsForBounty(BountyTargetCandidate target, GameNPC npc) =>
+            target != null && npc != null && npc.Realm == eRealm.None &&
+            string.Equals(npc.Name, target.Name, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// Rerolls can be repeated, but the half-XP flag never clears. A reroll may

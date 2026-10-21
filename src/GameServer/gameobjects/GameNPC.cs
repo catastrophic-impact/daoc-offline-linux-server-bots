@@ -1703,6 +1703,23 @@ namespace DOL.GS
 		}
 
 		/// <summary>
+		/// Sends this NPC's current quest marker to a player who already sees it. Markers are otherwise only sent when the
+		/// NPC is first shown, so a quest that opened at a new level had no marker until the player logged out (known
+		/// issues #4, 2026-10-16). NPCs without quests or a marker are skipped so a level-up does not message every bot.
+		/// </summary>
+		public void RefreshQuestIndicator(GamePlayer player)
+		{
+			if (player == null) return;
+			eQuestIndicator indicator = GetQuestIndicator(player);
+			bool hasQuests;
+			lock (_questListToGiveLock) hasQuests = m_questListToGive.Count > 0;
+			if (!hasQuests)
+				lock (_dataQuestsLock) hasQuests = DataQuestList.Count > 0;
+			if (indicator != eQuestIndicator.None || hasQuests)
+				player.Out.SendNPCsQuestEffect(this, indicator);
+		}
+
+		/// <summary>
 		/// Check if the npc can show a quest indicator to a player
 		/// Checks both scripted and data quests
 		/// </summary>
@@ -3831,16 +3848,22 @@ namespace DOL.GS
 		{
 			get
 			{
-				Dictionary<string, Ability> tmp = new Dictionary<string, Ability>();
-
+				// One copy per read (it used to build two and drop the first); pets and bots read it every AI turn
+				// (run 17, 2026-10-17: ability dictionaries were ~85 MB/min of the server's allocations).
 				lock (_abilitiesLock)
-				{
-					tmp = new Dictionary<string, Ability>(m_abilities);
-				}
-
-				return tmp;
+					return new Dictionary<string, Ability>(m_abilities);
 			}
 			protected set => m_abilities = value;
+		}
+
+		/// <summary>How many abilities this NPC has, without copying them.</summary>
+		public int AbilityCount
+		{
+			get
+			{
+				lock (_abilitiesLock)
+					return m_abilities?.Count ?? 0;
+			}
 		}
 
 		#endregion

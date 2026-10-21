@@ -43,7 +43,7 @@ public static class AutonomousDarknessFallsRoutePlan
     /// a tight 16-unit arrival ball; otherwise a complete strict native leg is
     /// mandatory. No uncertain route is returned.</summary>
     public static bool TryRejoin(Vector3 current, IReadOnlyList<Vector3> chain,
-        Func<Vector3, Vector3, bool> completeStrictLeg, out int nextIndex)
+        Func<Vector3, Vector3, bool> completeStrictLeg, out int nextIndex, int maxLegs = int.MaxValue)
     {
         nextIndex = -1;
         if (chain is not { Count: >= 2 } || completeStrictLeg == null ||
@@ -57,6 +57,7 @@ public static class AutonomousDarknessFallsRoutePlan
                 nextIndex = index + 1;
                 return true;
             }
+            if (maxLegs-- <= 0) return false;
             if (completeStrictLeg(current, chain[index]))
             {
                 nextIndex = index;
@@ -65,6 +66,14 @@ public static class AutonomousDarknessFallsRoutePlan
         }
         return false;
     }
+
+    /// <summary>Whether a failed chain join is worth trying again: another post, the wait is over, or the bot has
+    /// moved far enough to stand somewhere else.</summary>
+    public static bool ShouldRetryJoin(string failedKey, string key, Vector3 failedPosition, Vector3 current,
+        long now, long retryTick, float retryDistance) =>
+        !string.Equals(failedKey, key, StringComparison.Ordinal) || now >= retryTick ||
+        IsFinite(current) && IsFinite(failedPosition) &&
+        Vector3.DistanceSquared(current, failedPosition) >= retryDistance * retryDistance;
 
     public static bool IsAtWaypoint(Vector3 current, Vector3 waypoint) =>
         IsFinite(current) && IsFinite(waypoint) &&

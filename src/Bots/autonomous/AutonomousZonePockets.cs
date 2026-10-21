@@ -15,7 +15,11 @@ namespace DOL.GS;
 /// </summary>
 public static class AutonomousZonePockets
 {
-    public sealed record Data(int Cell, Dictionary<(ushort Zone, int X, int Y), (float Low, float High)> Cells);
+    public sealed record Data(int Cell, Dictionary<(ushort Zone, int X, int Y), (float Low, float High, float Margin)> Cells);
+
+    /// <summary>Height margin around a pocket's floor band unless the entry gives its own (a fifth number): Camelot's
+    /// sunken patch at 7,920 lies 90 below a real street, so its entries use 20.</summary>
+    public const float DefaultMargin = 96;
 
     private static readonly Lazy<Data> Loaded = new(Load);
 
@@ -31,12 +35,13 @@ public static class AutonomousZonePockets
     {
         using JsonDocument document = JsonDocument.Parse(json);
         int cell = document.RootElement.GetProperty("cell").GetInt32();
-        var cells = new Dictionary<(ushort, int, int), (float, float)>();
+        var cells = new Dictionary<(ushort, int, int), (float, float, float)>();
         foreach (JsonProperty zone in document.RootElement.GetProperty("zones").EnumerateObject())
         {
             ushort zoneId = ushort.Parse(zone.Name);
             foreach (JsonElement entry in zone.Value.EnumerateArray())
-                cells[(zoneId, entry[0].GetInt32(), entry[1].GetInt32())] = (entry[2].GetSingle(), entry[3].GetSingle());
+                cells[(zoneId, entry[0].GetInt32(), entry[1].GetInt32())] = (entry[2].GetSingle(), entry[3].GetSingle(),
+                    entry.GetArrayLength() > 4 ? entry[4].GetSingle() : DefaultMargin);
         }
         return new Data(cell, cells);
     }
@@ -44,7 +49,7 @@ public static class AutonomousZonePockets
     public static bool Contains(Data data, ushort zone, float x, float y, float floorZ)
     {
         var key = (zone, (int)Math.Floor(x / data.Cell), (int)Math.Floor(y / data.Cell));
-        return data.Cells.TryGetValue(key, out var band) && floorZ >= band.Low - 96 && floorZ <= band.High + 96;
+        return data.Cells.TryGetValue(key, out var band) && floorZ >= band.Low - band.Margin && floorZ <= band.High + band.Margin;
     }
 
     private static Data Load()

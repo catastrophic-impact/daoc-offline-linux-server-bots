@@ -113,6 +113,9 @@ public static partial class AutonomousBotGroupCoordinator
         public long DungeonArrivalHoldUntilTick { get; set; }
         public string DungeonArrivalCompletedCampId { get; set; } = string.Empty;
         public SharedCamp Camp { get; set; }
+        // When the current camp was chosen, and whether the party's arrival there was logged (AUTONOMOUS_GROUP_ARRIVED).
+        public long CampAssignedTick { get; set; }
+        public string ArrivalLoggedCampId { get; set; } = string.Empty;
         public Dictionary<string, long> RejectedDungeonCamps { get; } = new(StringComparer.Ordinal);
         public int WipePenalty { get; set; }
         public long? NoCampSinceTick { get; set; }
@@ -315,6 +318,8 @@ public static partial class AutonomousBotGroupCoordinator
 
     private static void AssignCamp(Session session, SharedCamp camp, GameBot[] members)
     {
+        if (!string.Equals(session.Camp?.Id, camp?.Id, StringComparison.Ordinal))
+            session.CampAssignedTick = GameLoop.GameLoopTime;
         session.Camp = camp;
         session.DungeonArrivalRegion = 0;
         session.DungeonInteriorStagingPoint = default;
@@ -580,8 +585,27 @@ public static partial class AutonomousBotGroupCoordinator
             if (!TryGetSession(bot.Group, out Session session) || session.Camp == null || session.Recovery.IsRegrouping)
                 return;
             session.Phase = "Grinding";
+            // Group arrivals were never recorded (2026-10-17: 618 group goal attempts had kills but no arrival), so how
+            // long parties take to reach their camps could not be measured.
+            if (!string.Equals(session.ArrivalLoggedCampId, session.Camp.Id, StringComparison.Ordinal))
+            {
+                session.ArrivalLoggedCampId = session.Camp.Id;
+                GameBot[] party = BotMembers(bot.Group);
+                Log.Info($"AUTONOMOUS_GROUP_ARRIVED group={session.Id} objective={session.ObjectiveKind} size={party.Length} " +
+                         $"level={(party.Length == 0 ? 0 : (int)party.Average(member => member.Level))} camp=\"{session.Camp.Id}\" " +
+                         $"target=\"{session.Camp.MonsterName}\" zone=\"{session.Camp.ZoneName}\" region={session.Camp.RegionId} " +
+                         $"travelMinutes={(session.CampAssignedTick == 0 ? -1 : (GameLoop.GameLoopTime - session.CampAssignedTick) / 60_000.0):0.0}");
+            }
             WriteSessionMetadata(session, BotMembers(bot.Group));
         }
+    }
+
+    /// <summary>The member that opens this party's pulls (route monsters included); null outside a coordinated party.</summary>
+    public static GameBot PartyPuller(GameBot member)
+    {
+        if (member?.Group == null) return null;
+        lock (Sync)
+            return TryGetSession(member.Group, out Session session) ? ChoosePuller(session, BotMembers(member.Group)) : null;
     }
 
     public static bool IsCohesive(Directive directive)
@@ -1238,6 +1262,20 @@ public static partial class AutonomousBotGroupCoordinator
                 // Never relocate an event party to an unrelated town while
                 // its expedition is counting attendance at a fixed service hub.
                 long memberKey = MemberKey(bot);
+                // 2026-10-16: Midgard raid parties gathering at Vindsaul Faste's Gothi of the Aesir kept a member on the
+                // one-cell walled-off patch at 704633,738032 (navmesh/pockets.json); every route from it failed and the
+                // member was dropped from the raid. A member standing in a listed pocket is put on the nearest real
+                // ground instead and retries at once.
+                if (bot.CurrentZone is Zone pocketZone && AutonomousZonePockets.Contains(pocketZone.ID, bot.X, bot.Y, bot.Z) &&
+                    AutonomousNavigationSurface.TryNearestWalkableFloor(PathfindingProvider.Instance, pocketZone,
+                        new System.Numerics.Vector3(bot.X, bot.Y, bot.Z), 1_500, out System.Numerics.Vector3 ground, leavePocket: true) &&
+                    bot.MoveInRegion(bot.CurrentRegionID, (int)ground.X, (int)ground.Y, (int)ground.Z, bot.Heading, true))
+                {
+                    session.ExpeditionRouteRetry.Remove(memberKey);
+                    Log.Warn($"REALM_RAID_HUB_POCKET_ESCAPE event={session.RaidMusterEvent} group={session.Id} bot={bot.Name} " +
+                             $"region={bot.CurrentRegionID} to={(int)ground.X},{(int)ground.Y},{(int)ground.Z}");
+                    return true;
+                }
                 if (session.HeldUnreachableMembers.Add(memberKey))
                     Log.Warn($"REALM_RAID_HUB_ROUTE_FAILED event={session.RaidMusterEvent} group={session.Id} bot={bot.Name} region={bot.CurrentRegionID} position={bot.X},{bot.Y},{bot.Z} reason={reason}");
                 int failures = session.ExpeditionRouteFailures[memberKey] = session.ExpeditionRouteFailures.GetValueOrDefault(memberKey) + 1;
@@ -2403,7 +2441,7 @@ public static partial class AutonomousBotGroupCoordinator
             Region borderRegion = WorldMgr.GetRegion(borderKeep.RegionId);
             foreach (Vector3 anchor in AutonomousRvrStaging.CandidateAnchors(borderKeep, leader.DatabaseID))
             {
-                if (!TryPoint(borderRegion, anchor, out point))
+                if (!TryPoint(borderRegion, anchor, out point) || !AutonomousRvrStaging.IsConnectedToKeep(borderKeep, point))
                     continue;
                 rendezvousName = borderKeep.Name;
                 rendezvousRegion = borderKeep.RegionId;

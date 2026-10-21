@@ -991,8 +991,16 @@ namespace DOL.GS
                 AutonomousBotGroupCoordinator.PveCorpseRecovery(this);
             if (groupDisposition == AutonomousBotGroupCoordinator.PveCorpseDisposition.HoldForResurrection)
                 return 3000;
-            bool resurrectionPossible = HasViableResurrector();
-            long releaseDelay = resurrectionPossible ? 90_000 : 20_000;
+            // A siege attacker also waits for any healer of its army nearby (AutonomousSiegeResurrection), not only its party's.
+            bool resurrectionPossible = HasViableResurrector() ||
+                IsAutonomousWorldBot && AutonomousSiegeResurrection.IsSiegeAttacker(this) &&
+                AutonomousSiegeResurrection.HasArmyResurrectorNear(this);
+            // A siege attacker's release is a long walk back from its realm's muster (run 18, 2026-10-17: Dun Dagda,
+            // 176,000 units), so with a resurrector in its party it waits longer for a raise, as players did.
+            long releaseDelay = resurrectionPossible
+                ? IsAutonomousWorldBot && AutonomousRvrEventLayer.TrySiegeRelease(AutonomousBotGroupCoordinator.RvrForceId(this), Realm,
+                    GameLoop.GameLoopTime, out _, out _) ? SiegeCorpseWaitMilliseconds : 90_000
+                : 20_000;
             if (groupDisposition is not (AutonomousBotGroupCoordinator.PveCorpseDisposition.ReleaseAndDisband or
                 AutonomousBotGroupCoordinator.PveCorpseDisposition.ReleaseAndRejoin) &&
                 deadFor < releaseDelay)
@@ -1025,6 +1033,8 @@ namespace DOL.GS
             _deathRecoveryTimer = null;
             return 0;
         }
+
+        public const long SiegeCorpseWaitMilliseconds = 240_000;
 
         private bool HasViableResurrector()
         {
@@ -1086,6 +1096,13 @@ namespace DOL.GS
             {
                 releaseRegion = hubRegion;
                 release = hub;
+            }
+            if (release == null && IsAutonomousWorldBot &&
+                AutonomousRvrEventLayer.TrySiegeRelease(AutonomousBotGroupCoordinator.RvrForceId(this), Realm,
+                    GameLoop.GameLoopTime, out ushort musterRegion, out Point3D muster))
+            {
+                releaseRegion = musterRegion;
+                release = muster;
             }
             if (release == null && IsAutonomousWorldBot)
             {
@@ -2529,11 +2546,13 @@ namespace DOL.GS
         public override bool CastSpell(Spell spell, SpellLine line, ISpellCastingAbilityHandler spellCastingAbilityHandler = null, bool checkLos = true)
         {
             if (CompanionFollowPolicy.DeferBuff(this, spell)) return false;
+            if (AutonomousGroupFormationFollow.DeferBuff(this, spell)) return false;
             // Final boundary as well as selection filtering: no rank of the
             // disabled shield can keep a Cabalist/Enchanter bot channeling.
             if (AutonomousPetSupport.IsDisabledBotDamageShield(this, spell) ||
                 BotSpellPower.BlocksAttackerRotation(this, spell) ||
-                !AnimistSingleTargetPolicy.AllowsAutomatedSpell(this, spell))
+                !AnimistSingleTargetPolicy.AllowsAutomatedSpell(this, spell) ||
+                !BotAnimistPolicy.MayPlant(this, spell))
             {
                 CabalistRestDiagnostics.Attempt(this, spell, false);
                 return false;
@@ -2604,6 +2623,9 @@ namespace DOL.GS
 
         public override bool AddToWorld()
         {
+            // The guild name under the bot: its own guild (gamebot) or its owner's (/spawn companion), set before it
+            // appears so no extra update is sent (AutonomousBotGuilds).
+            GuildName = AutonomousBotGuilds.GuildNameFor(this);
             if (!base.AddToWorld())
                 return false;
 

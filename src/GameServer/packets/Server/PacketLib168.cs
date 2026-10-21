@@ -1178,7 +1178,8 @@ namespace DOL.GS.PacketHandler
 					{
 						pak.WriteByte((byte) item.SlotPosition);
 						var model = (ushort) (item.Model & 0x1FFF);
-						int texture = (item.Emblem != 0) ? item.Emblem : item.Color;
+						// A gamebot's or companion's cloak and shield show its guild emblem (AutonomousBotGuilds).
+						int texture = AutonomousBotGuilds.Texture(living, item);
 
 						if ((texture & ~0xFF) != 0)
 							model |= 0x8000;

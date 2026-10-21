@@ -116,6 +116,13 @@ namespace DOL.AI.Brain
                     _lastRoamIndex = 0;
                     Body.ReturnToSpawnPoint(NpcMovementComponent.DEFAULT_WALK_SPEED);
                 }
+                else if (Body.InCombatInLast(10 * 1000))
+                {
+                    // Run 18 (2026-10-17, owner: change mechanics to suit bots): the raid chased him round his loop for
+                    // 40 minutes without killing him; a 300-bot raid cannot keep up with a target that never stops. He
+                    // now stands while he is being hit and walks on 10 s after the last blow (stats unchanged).
+                    if (Body.IsMoving) Body.StopMoving();
+                }
                 else if(!Body.IsMoving)
                     // Goal 3 (owner permission to tune epic bosses, 2026-10-07): he walked his loop at 195-250, faster than
                     // a raid runs (~191), so most of a 300-bot raid could never keep up (Caer Sidi run: 86% -> 60% in 15

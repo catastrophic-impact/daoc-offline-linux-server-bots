@@ -18,5 +18,8 @@ namespace DOL.GS
         public static IEnumerable<GameLiving> Nearby(GameNPC origin, ushort range) =>
             origin.GetPlayersInRadius(range).Cast<GameLiving>()
                 .Concat(origin.GetNPCsInRadius(range).OfType<GameBot>()).Where(CanTrigger);
+
+        /// <summary>A raid is still in the room (an encounter piece keeps its damage while it is).</summary>
+        public static bool AnyNearby(GameNPC origin, ushort range) => Nearby(origin, range).Any();
     }
 }

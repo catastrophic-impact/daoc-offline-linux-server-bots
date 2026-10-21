@@ -559,6 +559,8 @@ namespace DOL.GS
 				GuildMgr.RefreshPersonalHouseEmblem(player, this);
 			}
 
+			// Companions respawned at login show the guild once the owner is back in it.
+			AutonomousBotGuilds.PresentCompanions(player);
 			return true;
 		}
 
@@ -657,6 +659,8 @@ namespace DOL.GS
 				addPlayer.Out.SendMessage("You have agreed to join " + this.Name + "!", eChatType.CT_Group, eChatLoc.CL_SystemWindow);
 				addPlayer.Out.SendMessage("Your current rank is " + addPlayer.GuildRank.Title + "!", eChatType.CT_Group, eChatLoc.CL_SystemWindow);
 				SendMessageToGuildMembers(addPlayer.Name + " has joined the guild!", eChatType.CT_Group, eChatLoc.CL_SystemWindow);
+				// The new member's /spawn companions wear the guild name and emblem.
+				AutonomousBotGuilds.PresentCompanions(addPlayer);
 			}
 			catch (Exception e)
 			{
@@ -688,6 +692,8 @@ namespace DOL.GS
 				member.SaveIntoDatabase();
 
 				member.Out.SendObjectGuildID(member, member.Guild);
+				// Its /spawn companions drop the guild name and emblem with it.
+				AutonomousBotGuilds.PresentCompanions(member);
 				// Send message to removerClient about successful removal
 				if (removername == member.Name)
 					member.Out.SendMessage("You leave the guild.", DOL.GS.PacketHandler.eChatType.CT_System, DOL.GS.PacketHandler.eChatLoc.CL_SystemWindow);

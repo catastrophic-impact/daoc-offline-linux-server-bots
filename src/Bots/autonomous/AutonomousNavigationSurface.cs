@@ -41,13 +41,15 @@ public static class AutonomousNavigationSurface
     /// teleporter, 2026-10-13). False when the actor already stands on floor with a verified local way out, or when no
     /// floor within <paramref name="maxLateral"/> outside a known walled-off pocket has one.
     /// </summary>
-    public static bool TryNearestWalkableFloor(IPathfindingMgr nav, Zone zone, Vector3 position, float maxLateral, out Vector3 floor)
+    public static bool TryNearestWalkableFloor(IPathfindingMgr nav, Zone zone, Vector3 position, float maxLateral, out Vector3 floor,
+        bool leavePocket = false)
     {
         floor = position;
         if (zone == null || !nav.IsAvailable || !nav.HasNavmesh(zone))
             return false;
         bool onMesh = TryFloor(nav, zone, position, out Vector3 here);
-        if (onMesh && AutonomousRendezvousNavigation.HasLocalExit(nav, zone, here))
+        // leavePocket: the bot stands in a listed walled-off pocket; its patch can look fine locally, so always search.
+        if (onMesh && !leavePocket && AutonomousRendezvousNavigation.HasLocalExit(nav, zone, here))
             return false;
         bool Usable(Vector3 p) =>
             Vector2.Distance(new(p.X, p.Y), new(position.X, position.Y)) <= maxLateral &&

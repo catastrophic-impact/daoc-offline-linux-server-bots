@@ -19,7 +19,6 @@ namespace DOL.GS
         private sealed class State
         {
             public long NextRelocation;
-            public long NextMainSwap;
             public long NextDiagnostic;
             public GameLiving PendingTarget;
             public GameObject PendingCastTarget;
@@ -41,7 +40,6 @@ namespace DOL.GS
         // Re-summoning the main shroom costs a 5 s cast, so only move it when
         // the fight has really moved away, and not on every target switch.
         public const long RelocationCooldownMilliseconds = 8_000;
-        private const long MainSwapCooldownMilliseconds = 60_000;
         private const long DiagnosticIntervalMilliseconds = 60_000;
         private const int FightScanRadius = 1200;
         private const int PlantSpacing = 700;
@@ -51,6 +49,23 @@ namespace DOL.GS
         private static readonly string[] TravelWords = { "travel", "walking", "crossing", "meeting", "returning", "riding" };
         public static bool AppliesTo(GameLiving owner) => owner is GameBot bot &&
             bot.CharacterClass?.ID == (int)eCharacterClass.Animist;
+
+        /// <summary>
+        /// Shrooms are planted only for a fight and never in a city or town (known issues #4, 2026-10-16): an idle
+        /// Animist used to plant its main shroom wherever it stood, so towns filled with mushrooms. A town is a capital
+        /// city or a named town area (the same areas bots idle in, <see cref="AutonomousWorldBotController.IsIdleTownArea"/>).
+        /// </summary>
+        public static bool IsInTown(GameLiving living)
+        {
+            if (living?.CurrentRegion?.IsCapitalCity == true) return true;
+            Zone zone = living?.CurrentZone;
+            return zone?.GetAreasOfSpot(living.X, living.Y, living.Z)?.OfType<AbstractArea>()
+                .Any(AutonomousWorldBotController.IsIdleTownArea) == true;
+        }
+
+        /// <summary>Whether a shroom of this kind may be planted here (the final check on every Animist bot cast).</summary>
+        public static bool MayPlant(GameLiving owner, Spell spell) =>
+            !AppliesTo(owner) || !AnimistSingleTargetPolicy.IsTurretSummon(spell) || !IsInTown(owner);
 
         public static bool ValidEncounter(GameBot bot, GameLiving target) =>
             target != null && target != bot && target.IsAlive && target.ObjectState == GameObject.eObjectState.Active &&
@@ -160,13 +175,12 @@ namespace DOL.GS
                 bot.CommandNpcRelease();
 
             if (now < nextDeployable) return false;
+            // Only for a fight, and never in a city or town (no shroom is planted between fights any more).
+            if (!encounter || IsInTown(bot)) return false;
             // Enumerate learned spells only when a cast can actually be attempted.
             Kit kit = ReadKit(bot, allowed);
             main = bot.ControlledBrain?.Body as TurretPet;
             bool hasMain = main?.IsAlive == true && main.ObjectState == GameObject.eObjectState.Active;
-
-            if (!encounter)
-                return MaintainMainOutOfCombat(bot, kit, main, hasMain, state, now, ref nextDeployable, out activity);
 
             // The target is out of shroom reach (it moved, or the Animist has
             // not closed yet). Returning lets the ordinary approach move the
@@ -283,39 +297,6 @@ namespace DOL.GS
                 _ => $"Planting field turret: {used.Name}"
             };
             return true;
-        }
-
-        private static bool MaintainMainOutOfCombat(GameBot bot, Kit kit, TurretPet main, bool hasMain, State state,
-            long now, ref long nextDeployable, out string activity)
-        {
-            activity = string.Empty;
-            (Spell Spell, SpellLine Line) preferred = kit.PreferredMain;
-            if (preferred.Spell == null)
-                return false;
-
-            if (bot.ControlledBrain == null)
-            {
-                if (!AutonomousPetSupport.CanCast(bot, preferred.Spell) || !Cast(bot, null, preferred, bot, null, mainNearFight: true))
-                    return false;
-                nextDeployable = now + Math.Max(1500, preferred.Spell.CastTime + 500);
-                state.NextRelocation = now + RelocationCooldownMilliseconds;
-                activity = $"Deploying main turret: {preferred.Spell.Name}";
-                return true;
-            }
-
-            // Between fights, swap a main shroom of the wrong kind (or an
-            // outgrown rank) for the preferred one, with power to spare.
-            if (hasMain && bot.ControlledBrain is TurretBrain { IsMainPet: true } && !bot.InCombat &&
-                now >= state.NextMainSwap && bot.MaxMana > 0 && bot.Mana * 100 >= bot.MaxMana * 60 &&
-                main.TurretSpell is Spell current && Payload(preferred.Spell) is Spell wanted &&
-                current.ID != wanted.ID && !string.Equals(current.Name, wanted.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                state.NextMainSwap = now + MainSwapCooldownMilliseconds;
-                bot.CommandNpcRelease();
-                activity = $"Replacing main turret with {preferred.Spell.Name}";
-                return true;
-            }
-            return false;
         }
 
         private static Kit ReadKit(GameBot bot, Func<Spell, bool> allowed)

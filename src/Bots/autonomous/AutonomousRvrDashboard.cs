@@ -130,10 +130,18 @@ public static class AutonomousRvrDashboard
             // How many bots stand by the lord and how many have him targeted (gates fell for hours, lord never hit).
             $"atLord={(lord == null ? 0 : inside.Count(bot => bot.IsWithinRadius(lord, 800)))} " +
             $"onLord={(lord == null ? 0 : inside.Count(bot => bot.TargetObject == lord))} " +
+            // Attackers only (atLord counts the holder's defenders too), and those on the lord's own floor.
+            $"attackersAtLord={(lord == null ? 0 : inside.Count(bot => bot.Realm != central.Realm && bot.IsWithinRadius(lord, 800)))} " +
+            $"attackersOnLordFloor={(lord == null ? 0 : inside.Count(bot => bot.Realm != central.Realm && bot.IsWithinRadius(lord, 800) && Math.Abs(bot.Z - lord.Z) < 200))} " +
             // Live, not the saved roster rows (positions there are saved only every few minutes).
             $"inside={inside.Length} moving={inside.Count(bot => bot.IsMoving)} inCombat={inside.Count(bot => bot.InCombat)} " +
             $"medianToKeep={(inside.Length == 0 ? 0 : (int)inside.Select(bot => bot.GetDistanceTo(keepPoint)).OrderBy(d => d).ElementAt(inside.Length / 2))} " +
-            $"activities=\"{string.Join("; ", inside.GroupBy(bot => ActivityKind(bot.PersistentRecord?.Activity)).OrderByDescending(g => g.Count()).Take(5).Select(g => $"{g.Key}:{g.Count()}"))}\"");
+            $"activities=\"{string.Join("; ", inside.GroupBy(bot => ActivityKind(bot.PersistentRecord?.Activity)).OrderByDescending(g => g.Count()).Take(5).Select(g => $"{g.Key}:{g.Count()}"))}\" " +
+            // Where the lord and the standing doors are, and how close the bots storming him get (run 18: they stopped
+            // 1,300-1,500 from the keep centre, the lord 577 above it).
+            $"lordAt={(lord == null ? "none" : $"{lord.X},{lord.Y},{lord.Z}")} " +
+            $"doorsUp=\"{string.Join(";", doors.Where(door => door.IsAlive).Select(door => $"{door.DoorId}@{door.X},{door.Y},{door.Z}"))}\" " +
+            $"stormNearest={(lord == null ? -1 : inside.Where(bot => bot.PersistentRecord?.Activity?.StartsWith("Storming") == true).Select(bot => (int)bot.GetDistanceTo(lord)).DefaultIfEmpty(-1).Min())}");
     }
 
     private static void Publish(object state)

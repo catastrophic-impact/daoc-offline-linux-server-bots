@@ -3455,7 +3455,9 @@ namespace DOL.GS
 		/// Table of skills currently disabled
 		/// skill => disabletimeout (ticks) or 0 when endless
 		/// </summary>
-		private readonly Dictionary<KeyValuePair<int, Type>, KeyValuePair<long, Skill>> m_disabledSkills = new Dictionary<KeyValuePair<int, Type>, KeyValuePair<long, Skill>>();
+		// (int, Type) keys: KeyValuePair has no IEquatable, so every lookup boxed the key and its id (run 17, 2026-10-17:
+		// ~100 MB/min of KeyValuePair and Int32 allocations).
+		private readonly Dictionary<(int Id, Type Type), KeyValuePair<long, Skill>> m_disabledSkills = new();
 		private readonly Lock _disabledSkillsLock = new();
 
 		/// <summary>
@@ -3467,7 +3469,7 @@ namespace DOL.GS
 		{
 			lock (_disabledSkillsLock)
 			{
-				KeyValuePair<int, Type> key = new(skill.ID, skill.GetType());
+				(int, Type) key = (skill.ID, skill.GetType());
 
 				if (m_disabledSkills.TryGetValue(key, out KeyValuePair<long, Skill> value))
 				{
@@ -3513,7 +3515,7 @@ namespace DOL.GS
 		{
 			lock (_disabledSkillsLock)
 			{
-				KeyValuePair<int, Type> key = new(skill.ID, skill.GetType());
+				(int, Type) key = (skill.ID, skill.GetType());
 
 				if (duration > 0)
 					m_disabledSkills[key] = new(GameLoop.GameLoopTime + duration, skill);
@@ -3538,7 +3540,7 @@ namespace DOL.GS
 				{
 					Skill skill = tuple.Item1;
 					int duration = tuple.Item2;
-					KeyValuePair<int, Type> key = new(skill.ID, skill.GetType());
+					(int, Type) key = (skill.ID, skill.GetType());
 
 					if (duration > 0)
 						m_disabledSkills[key] = new(GameLoop.GameLoopTime + duration, skill);
@@ -3556,7 +3558,7 @@ namespace DOL.GS
 		{
 			lock (_disabledSkillsLock)
 			{
-				m_disabledSkills.Remove(new(skill.ID, skill.GetType()));
+				m_disabledSkills.Remove((skill.ID, skill.GetType()));
 			}
 		}
 

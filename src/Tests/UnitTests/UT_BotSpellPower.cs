@@ -690,7 +690,7 @@ namespace DOL.UnitTests
             Field(typeof(GameLiving), actor, "<TempProperties>k__BackingField", new PropertyCollection());
             Field(typeof(GameLiving), actor, "m_effects", new GameEffectList(actor));
             Field(typeof(GameLiving), actor, "m_abilities", new Dictionary<string, Ability>());
-            Field(typeof(GameLiving), actor, "m_disabledSkills", new Dictionary<KeyValuePair<int, Type>, KeyValuePair<long, Skill>>());
+            Field(typeof(GameLiving), actor, "m_disabledSkills", new Dictionary<(int, Type), KeyValuePair<long, Skill>>());
             Field(typeof(GameLiving), actor, "<ActivePulseSpells>k__BackingField", new ConcurrentDictionary<eSpellType, Spell>());
             if (actor is GameNPC npc)
             {

@@ -4780,6 +4780,10 @@ namespace DOL.GS
                     if (player == null) continue;
                     player.Out.SendEmoteAnimation(this, eEmote.LvlUp);
                 }
+
+                // Quests that open (or close) at the new level show their marker now, not after a log out.
+                foreach (GameNPC npc in GetNPCsInRadius(WorldMgr.VISIBILITY_DISTANCE))
+                    npc?.RefreshQuestIndicator(this);
             }
 
             // Reset taskDone per level.

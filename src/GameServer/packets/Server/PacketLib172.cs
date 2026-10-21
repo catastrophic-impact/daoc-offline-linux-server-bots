@@ -220,7 +220,7 @@ namespace DOL.GS.PacketHandler
 						if (model > 2952)
 							model = 0;
 
-						int texture = (item.Emblem != 0) ? item.Emblem : item.Color;
+						int texture = AutonomousBotGuilds.Texture(living, item); // guild emblem on a bot's cloak and shield
 
 						if ((texture & ~0xFF) != 0)
 							model |= 0x8000;

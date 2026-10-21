@@ -21,6 +21,13 @@ namespace DOL.GS
         private int _routeThreatPullRepeats;
         private long _lastRouteThreatPullTick;
         private const int RouteThreatPullAttempts = 3;
+        // A party holding in front of a route monster it may not pull yet. Run 17 (2026-10-17): 12,472 of 13,547 level 50
+        // party route-threat decisions were the same hold repeated (114 loops in 78 parties, one for 98 minutes): only
+        // the leader looks ahead, only the party's puller may open a pull, and a leader that was not the puller held
+        // forever. Now the puller takes the pull, and a hold ends after RouteThreatHoldLimitMilliseconds.
+        private GameNPC _routeThreatHold;
+        private long _routeThreatHoldSince;
+        public const long RouteThreatHoldLimitMilliseconds = 75_000;
 
         /// <summary>
         /// Open-world route threat awareness (see AutonomousRouteThreatPolicy). Called right before
@@ -143,15 +150,6 @@ namespace DOL.GS
                     return true;
 
                 default: // Pull
-                    if (grouped && !AutonomousBotGroupCoordinator.CanInitiateNewPull(bot))
-                    {
-                        bot.StopMovingOnPath();
-                        bot.StopMoving();
-                        SetStatus(bot, "Holding before a route threat", GoalText(),
-                            $"Waiting for the whole party before clearing {blocker.Name} from the route",
-                            blocker.Name, _camp?.ZoneName ?? string.Empty);
-                        return true;
-                    }
                     if (!AutonomousNavigationSurface.TryFloor(nav, zone, blockerPosition, out Vector3 blockerFloor) ||
                         !AutonomousZoneItinerary.HasCompleteCorridor(nav, zone, new(bot.X, bot.Y, bot.Z), blockerFloor))
                     {
@@ -172,12 +170,62 @@ namespace DOL.GS
                                  $"attempts={RouteThreatPullAttempts} at={blocker.X},{blocker.Y},{blocker.Z} zone=\"{zone.Description}\"");
                         return false;
                     }
-                    bot.StopMovingOnPath();
-                    bot.StopMoving();
-                    bot.TargetObject = blocker;
+                    GameBot puller = grouped ? AutonomousBotGroupCoordinator.PartyPuller(bot) ?? bot : bot;
+                    if (grouped && !AutonomousBotGroupCoordinator.CanInitiateNewPull(puller))
+                    {
+                        if (_routeThreatHold != blocker)
+                        {
+                            _routeThreatHold = blocker;
+                            _routeThreatHoldSince = now;
+                        }
+                        if (now - _routeThreatHoldSince < RouteThreatHoldLimitMilliseconds)
+                        {
+                            bot.StopMovingOnPath();
+                            bot.StopMoving();
+                            SetStatus(bot, "Holding before a route threat", GoalText(),
+                                $"Waiting for the whole party before clearing {blocker.Name} from the route",
+                                blocker.Name, _camp?.ZoneName ?? string.Empty);
+                            return true;
+                        }
+                        // The party could not get ready to pull: go around if there is a way, else walk on and fight it
+                        // if it comes (the party defends itself as on any road).
+                        _routeThreatHold = null;
+                        Log.Info($"AUTONOMOUS_ROUTE_THREAT_HOLD_EXPIRED bot={bot.Name} id={bot.DatabaseID} group={_groupDirective.GroupId} " +
+                                 $"target=\"{blocker.Name}\" puller={puller.Name} seconds={RouteThreatHoldLimitMilliseconds / 1000} " +
+                                 $"then={(detour.HasValue ? "detour" : "pass")} at={blocker.X},{blocker.Y},{blocker.Z} zone=\"{zone.Description}\"");
+                        if (detour.HasValue)
+                        {
+                            _routeThreatDetours[blocker] = detours + 1;
+                            _routeRecoveryWaypoint = detour.Value;
+                            _routeRecoveryArrivalRadius = 60;
+                            _nextMoveOrderTick = 0;
+                            bot.ForcePathReplot();
+                            return false;
+                        }
+                        _unreachableRouteThreats.Add(blocker);
+                        return false;
+                    }
+                    _routeThreatHold = null;
                     _lastEngagedCon = con;
                     _routeInterruptedByCombat = true;
                     AutonomousBotGroupCoordinator.MarkCombatObserved(bot.Group);
+                    if (puller != bot && puller.Brain is BotBrain pullerBrain)
+                    {
+                        // The party's puller opens on it, as it opens camp pulls; the leader holds the party meanwhile.
+                        puller.StopMovingOnPath();
+                        puller.StopMoving();
+                        puller.TargetObject = blocker;
+                        pullerBrain.AddToAggroList(blocker, Math.Max(25, blocker.EffectiveLevel * 10));
+                        pullerBrain.FSM.SetCurrentState(eFSMStateType.AGGRO);
+                        bot.StopMovingOnPath();
+                        bot.StopMoving();
+                        SetStatus(bot, $"Clearing the route: {blocker.Name}", GoalText(),
+                            $"{puller.Name} is pulling a monster ahead on the route", blocker.Name, _camp?.ZoneName ?? string.Empty);
+                        return true;
+                    }
+                    bot.StopMovingOnPath();
+                    bot.StopMoving();
+                    bot.TargetObject = blocker;
                     brain.AddToAggroList(blocker, Math.Max(25, blocker.EffectiveLevel * 10));
                     brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
                     if (SavageBotCombatPolicy.MustMeleePull(characterClass))

@@ -290,7 +290,7 @@ namespace DOL.GS.PacketHandler
 					{
 						ushort model = (ushort)(item.Model & 0x1FFF);
 						int slot = item.SlotPosition;
-						int texture = (item.Emblem != 0) ? item.Emblem : item.Color;
+						int texture = AutonomousBotGuilds.Texture(living, item); // guild emblem on a bot's cloak and shield
 						if (item.SlotPosition == Slot.LEFTHAND || item.SlotPosition == Slot.CLOAK) // for test only cloack and shield
 							slot = slot | ((texture & 0x010000) >> 9); // slot & 0x80 if new emblem
 						pak.WriteByte((byte)slot);

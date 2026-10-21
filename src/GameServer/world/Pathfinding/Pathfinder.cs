@@ -28,6 +28,15 @@ namespace DOL.GS
         private PathBuffer _calculationBuffer = new();
 
         private Vector3 _lastTarget = Vector3.Zero;
+        // A closed door with no way around it is remembered (2026-10-17: followers and pets behind a sieged keep's
+        // doors re-planned the detour on every follow check, ~1 CPU core).
+        private Vector3 _doorDetourFailedTarget;
+        private long _doorDetourFailedUntil;
+        private long _lastNoPathTick;
+        public const int DoorDetourRetryMilliseconds = 5_000;
+        public const int RecentFailureMilliseconds = 2_000;
+        private static long _nextDoorHoldReportTick;
+        private static int _doorHoldsSinceReport;
         private PathVisualization _pathVisualization;
 
         public static EDtPolyFlags[] DefaultFilters => PathfindingProvider.Instance.DefaultFilters;
@@ -204,11 +213,27 @@ namespace DOL.GS
             }
 
             // Check if any doors on the path have become closed and can't be opened via interaction.
-            // If so, replot with door avoidance filters.
-            if (PathContainClosedUnopenableDoor(_activePath.Doors) && !TryApplyAlternativePath(zone, position, target))
+            // If so, replot with door avoidance filters. A detour that just failed is not searched again until
+            // the target moves or a few seconds pass; the NPC holds as it did after the failure.
+            if (TryFindClosedUnopenableDoor(_activePath.Doors, out GameDoorBase closedDoor))
             {
-                nextNode = null;
-                return false;
+                long now = GameLoop.GameLoopTime;
+                if (ShouldRetryDoorDetour(now, _doorDetourFailedUntil, _doorDetourFailedTarget, target) &&
+                    TryApplyAlternativePath(zone, position, target))
+                    _doorDetourFailedUntil = 0;
+                else
+                {
+                    if (now >= _doorDetourFailedUntil || !_doorDetourFailedTarget.IsInRange(target, MIN_TARGET_DIFF_REPLOT_DISTANCE))
+                    {
+                        _doorDetourFailedTarget = target;
+                        _doorDetourFailedUntil = now + DoorDetourRetryMilliseconds;
+                        ReportDoorHold(closedDoor, position, target, now);
+                    }
+                    PathfindingStatus = PathfindingStatus.NoPathFound;
+                    _lastNoPathTick = now;
+                    nextNode = null;
+                    return false;
+                }
             }
 
             // Friendly keep doors are traversed by interaction, not opened to
@@ -245,9 +270,17 @@ namespace DOL.GS
             return true;
         }
 
+        // Battleground bots pass their own realm's keep doors too, as players do: the Midgard and Hibernia portal keeps
+        // have a door on the way to the exit, and run 21 (2026-10-17) counted ~190 bots that could not leave a
+        // battleground to train (Albion's exit has no door, so only Albion got out).
+        // A realm's portal keep is where its bots arrive in the frontier: every bot of that realm leaves through its door.
+        // Run 22 (2026-10-18): 136 Hibernian bots without an RvR objective could not leave Hibernia's portal keep in
+        // Odin's Gate (120 route give-ups, door 115000902 held 35 times).
         public static bool CanUseFriendlyKeepDoor(GameNPC owner, GameKeepDoor door) =>
             owner is GameBot { IsAutonomousWorldBot: true, IsAlive: true } bot &&
             (AutonomousObjectiveAssignments.Is(bot, eAutonomousObjectiveKind.RvR) ||
+             BattlegroundBrackets.IsBattlegroundRegion(bot.CurrentRegionID) ||
+             door?.Component?.Keep?.IsPortalKeep == true ||
              bot.TempProperties?.GetProperty<AutonomousFrontierTransport.Request>(AutonomousFrontierTransport.RequestKey)
                  ?.Passage?.Medallion == "home_necklace") &&
             door?.Component?.Keep != null && bot.Realm != eRealm.None && door.Realm == bot.Realm;
@@ -272,7 +305,7 @@ namespace DOL.GS
             return false;
         }
 
-        private bool PathContainClosedUnopenableDoor(Dictionary<WrappedPathfindingNode, List<GameDoorBase>> doorsOnPath)
+        private bool TryFindClosedUnopenableDoor(Dictionary<WrappedPathfindingNode, List<GameDoorBase>> doorsOnPath, out GameDoorBase closed)
         {
             foreach (List<GameDoorBase> doorsAroundNode in doorsOnPath.Values)
             {
@@ -280,11 +313,37 @@ namespace DOL.GS
                 {
                     if (door.State is eDoorState.Closed && !door.CanBeOpenedViaInteraction &&
                         !(door is GameKeepDoor keepDoor && CanUseFriendlyKeepDoor(Owner, keepDoor)))
+                    {
+                        closed = door;
                         return true;
+                    }
                 }
             }
 
+            closed = null;
             return false;
+        }
+
+        /// <summary>A failed door detour is searched again once its wait is over or the target has moved.</summary>
+        public static bool ShouldRetryDoorDetour(long now, long failedUntil, Vector3 failedTarget, Vector3 target) =>
+            now >= failedUntil || !failedTarget.IsInRange(target, MIN_TARGET_DIFF_REPLOT_DISTANCE);
+
+        /// <summary>No path was found to about this target in the last <see cref="RecentFailureMilliseconds"/>.</summary>
+        public bool HasRecentFailure(Vector3 target) =>
+            PathfindingStatus == PathfindingStatus.NoPathFound && GameLoop.GameLoopTime - _lastNoPathTick < RecentFailureMilliseconds &&
+            _lastTarget.IsInRange(target, MIN_TARGET_DIFF_REPLOT_DISTANCE);
+
+        private void ReportDoorHold(GameDoorBase door, Vector3 position, Vector3 target, long now)
+        {
+            System.Threading.Interlocked.Increment(ref _doorHoldsSinceReport);
+            long next = System.Threading.Interlocked.Read(ref _nextDoorHoldReportTick);
+            if (now < next || System.Threading.Interlocked.CompareExchange(ref _nextDoorHoldReportTick, now + 60_000, next) != next)
+                return;
+            int holds = System.Threading.Interlocked.Exchange(ref _doorHoldsSinceReport, 0);
+            if (log.IsInfoEnabled)
+                log.Info($"PATH_CLOSED_DOOR_HOLD holdsLastMinute={holds} npc={Owner?.Name} id={Owner?.ObjectID} region={Owner?.CurrentRegionID} " +
+                         $"at={position.X:0},{position.Y:0},{position.Z:0} target={target.X:0},{target.Y:0},{target.Z:0} " +
+                         $"door={door?.Name} doorId={door?.DoorId} doorAt={door?.X},{door?.Y},{door?.Z}");
         }
 
         private bool TryApplyAlternativePath(Zone zone, Vector3 position, Vector3 target)
@@ -302,12 +361,15 @@ namespace DOL.GS
             }
 
             PathfindingStatus = PathfindingStatus.NoPathFound;
+            _lastNoPathTick = GameLoop.GameLoopTime;
             return false;
         }
 
         private void UpdatePathState(PathfindingStatus status, Vector3 target)
         {
             PathfindingStatus = status;
+            if (status == PathfindingStatus.NoPathFound)
+                _lastNoPathTick = GameLoop.GameLoopTime;
             _lastTarget = target;
             ForceReplot = false;
             _pathVisualization?.Visualize(_activePath.Nodes, Owner.CurrentRegion);

@@ -403,7 +403,7 @@ namespace DOL.AI.Brain
 		/// </summary>
 		public override void CheckAbilities()
 		{
-			if (Body.Abilities == null || Body.Abilities.Count <= 0)
+			if (Body.AbilityCount <= 0)
 				return;
 
 			foreach (Ability ab in Body.Abilities.Values)

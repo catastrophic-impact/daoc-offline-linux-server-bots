@@ -382,7 +382,7 @@ public sealed class UT_SluaghbinderPriestSupport
             Set(typeof(GameLiving), actor, field, new System.Threading.Lock());
         Set(typeof(GameLiving), actor, "_disabledSkillsLock", new System.Threading.Lock());
         Set(typeof(GameLiving), actor, "m_disabledSkills",
-            new Dictionary<KeyValuePair<int, Type>, KeyValuePair<long, Skill>>());
+            new Dictionary<(int, Type), KeyValuePair<long, Skill>>());
         foreach (string property in new[] { "ItemBonus", "AbilityBonus", "BaseBuffBonusCategory", "SpecBuffBonusCategory", "OtherBonus", "DebuffCategory", "SpecDebuffCategory" })
             Set(typeof(GameLiving), actor, $"<{property}>k__BackingField", new PropertyIndexer());
         Set(typeof(GameLiving), actor, "<TempProperties>k__BackingField", new PropertyCollection());

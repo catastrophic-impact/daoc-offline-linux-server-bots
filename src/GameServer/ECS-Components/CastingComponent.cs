@@ -83,8 +83,17 @@ namespace DOL.GS
             // Only process up to count per tick to avoid infinite loops caused by some scripted NPCs able to call CastSpell recursively.
             int count = _startSkillRequests.Count;
 
-            while (count-- > 0 && _startSkillRequests.TryDequeue(out StartSkillRequest startSkillRequest))
+            // Requests are added from other threads (a scripted boss casting from OnAttackedByEnemy runs on the attack
+            // threads): take each one under the lock, run it outside (StartSkill may queue another). Unlocked, the
+            // queue was corrupted: Galladoria's Organic-Energy Mechanism threw in Queue.Grow on every hit (2026-10-17).
+            while (count-- > 0)
             {
+                StartSkillRequest startSkillRequest;
+                lock (_startSkillRequestsLock)
+                {
+                    if (!_startSkillRequests.TryDequeue(out startSkillRequest))
+                        break;
+                }
                 startSkillRequest.StartSkill();
                 startSkillRequest.ResetAndReturn();
             }
@@ -263,19 +272,26 @@ namespace DOL.GS
 
         public void ReturnToPool(CastSpellRequest request)
         {
-            // A few classes can cast many instant spells simultaneously.
-            if (_castSpellRequestPool.Count > 10)
-                return;
+            // The pools are taken from under _startSkillRequestsLock on other threads; return under it too.
+            lock (_startSkillRequestsLock)
+            {
+                // A few classes can cast many instant spells simultaneously.
+                if (_castSpellRequestPool.Count > 10)
+                    return;
 
-            _castSpellRequestPool.Enqueue(request);
+                _castSpellRequestPool.Enqueue(request);
+            }
         }
 
         public void ReturnToPool(UseAbilityRequest request)
         {
-            if (_useAbilityRequestPool.Count > 2)
-                return;
+            lock (_startSkillRequestsLock)
+            {
+                if (_useAbilityRequestPool.Count > 2)
+                    return;
 
-            _useAbilityRequestPool.Enqueue(request);
+                _useAbilityRequestPool.Enqueue(request);
+            }
         }
 
         public bool CheckCooldown(Spell spell)

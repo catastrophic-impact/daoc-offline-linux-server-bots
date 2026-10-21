@@ -36,15 +36,21 @@ namespace DOL.GS
         // skipped: its four Earthmenders (script-spawned, not named) healed it, and after the first hour the raid only
         // targets named encounters. Adds a script spawns beside the front are part of the fight; they come first.
         public const float EncounterAddRadius = 3_000f;
-        public static bool IsEncounterAdd(GameNPC npc, Vector3 front) =>
+        // Only while the encounter that spawned it is still alive nearby. Run 17 (2026-10-17): Lich Lord Sanguis's blood
+        // mages kept spawning after he died, the raid farmed them at the old front for 40 minutes and never went on to
+        // Apocalypse.
+        public static bool IsEncounterAdd(GameNPC npc, Vector3 front, IReadOnlyCollection<GameNPC> livingEncounters) =>
             npc.LoadedFromScript && npc is not IGameEpicNpc &&
-            Vector3.DistanceSquared(front, new(npc.X, npc.Y, npc.Z)) <= EncounterAddRadius * EncounterAddRadius;
+            Vector3.DistanceSquared(front, new(npc.X, npc.Y, npc.Z)) <= EncounterAddRadius * EncounterAddRadius &&
+            livingEncounters.Any(boss => boss.CurrentRegionID == npc.CurrentRegionID && boss.IsWithinRadius(npc, (int)EncounterAddRadius));
         private readonly Dictionary<GameNPC, long> _routeRetry = new();
         private readonly Dictionary<string, GameNPC> _finals = new();
         private GameNPC _target;
         private int _probeCursor;
         private static readonly Logging.Logger log = Logging.LoggerManager.Create(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private long _targetProgressTick, _targetStartTick, _holdSince, _nextHoldLog;
+        // Lowest health points seen (not percent: a percent of Galladoria's 125,000-health Corrupt Primal of Fire is 1,250
+        // points, and a few raiders wearing him down counted as no damage and he was skipped, run 23).
         private int _targetLowestHealth;
         // Final encounter muster (see MusterForFinal).
         private GameNPC _musterTarget;
@@ -193,7 +199,7 @@ namespace DOL.GS
                 _target = _chainTarget; _chain = null; _chainTarget = null;
                 // A fresh start: the chain's target kept the previous target's start, so Prince Ba'alorien
                 // inherited Prince Abdin's absence allowance and was skipped at 100% with the raid arriving (2026-10-14).
-                _targetProgressTick = _targetStartTick = now; _targetLowestHealth = _target.HealthPercent;
+                _targetProgressTick = _targetStartTick = now; _targetLowestHealth = _target.Health;
                 _targetClosest = float.MaxValue; _targetApproachTick = now;
                 Hold = false; Status = "Clearing " + _target.Name;
                 return true;
@@ -227,9 +233,24 @@ namespace DOL.GS
                 chain = known.Chain;
                 return chain != null;
             }
+            // A failure holds for every post near it. The raid front moves a few dozen units at a time, so the exact
+            // post rarely repeats: on 2026-10-17 every Prince Abdin raider re-ran the failing ~300-query search
+            // (1-5 s) on each AI turn and the server lagged.
+            var area = (realm, zone.ID, (int)encounter.X >> DarknessFallsChainFailureCellShift, (int)encounter.Y >> DarknessFallsChainFailureCellShift,
+                (int)encounter.Z >> DarknessFallsChainFailureCellShift, key.Item6);
+            if (DarknessFallsChainFailures.TryGetValue(area, out long failedUntil) && now < failedUntil)
+            {
+                chain = null;
+                return false;
+            }
             bool found = SearchDarknessFallsChain(nav, zone, realm, encounter, out chain);
             if (DarknessFallsChains.Count > 4_096) DarknessFallsChains.Clear();
             DarknessFallsChains[key] = (found ? chain : null, now + (found ? DarknessFallsChainMemoryMilliseconds : DarknessFallsChainFailureMemoryMilliseconds));
+            if (!found)
+            {
+                if (DarknessFallsChainFailures.Count > 4_096) DarknessFallsChainFailures.Clear();
+                DarknessFallsChainFailures[area] = now + DarknessFallsChainFailureMemoryMilliseconds;
+            }
             return found;
         }
 
@@ -237,6 +258,10 @@ namespace DOL.GS
         public const long DarknessFallsChainFailureMemoryMilliseconds = 60_000;
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<(eRealm, ushort, int, int, int, long), (Vector3[] Chain, long Until)>
             DarknessFallsChains = new();
+        /// <summary>Failures are shared by posts in the same 512-unit cell.</summary>
+        public const int DarknessFallsChainFailureCellShift = 9;
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<(eRealm, ushort, int, int, int, long), long>
+            DarknessFallsChainFailures = new();
 
         private static bool SearchDarknessFallsChain(IPathfindingMgr nav, Zone zone, eRealm realm, Vector3 encounter, out Vector3[] chain)
         {
@@ -395,6 +420,9 @@ namespace DOL.GS
         public const long CallTargetAfterMilliseconds = 90_000;
         public const long FrontRegroupMilliseconds = 3 * 60_000;
         private long _frontAbsentSince;
+        // The raiders' closest approach to an unreached front: while they keep closing in, the front is not given up.
+        private float _frontClosest = float.MaxValue;
+        private Vector3 _frontClosestFor;
 
         /// <summary>The living raider with the most living raiders within 1,000 units (the raid's main body).</summary>
         private static bool TryRegroupFront(GameLiving[] inside, out Vector3 front)
@@ -454,6 +482,16 @@ namespace DOL.GS
         private long _targetApproachTick;
         private long _nextTargetCall;
         public const long BusyCallAfterMilliseconds = 3 * 60_000;
+        public const int ThinAttackTargeting = 8;
+
+        /// <summary>
+        /// An encounter's hazard, not a monster to clear: Galladoria's Watery Vortexes float over the water primal's pool,
+        /// are out of reach, come back every six minutes and hit hard. Taken as the primal's adds, they were the raid's
+        /// target over and over; three were skipped for no damage and the raid fell from 230 inside to 28 (run 22).
+        /// </summary>
+        private static bool IsEncounterHazard(GameNPC npc) =>
+            npc.Brain?.GetType().Name is "VortexBrain" or "WaterfallAntipassBrain";
+        public const int ThinAttackNear = 16;
 
         /// <summary>
         /// The raid calls its target: when the encounter has taken no damage for 90 s although raid
@@ -463,7 +501,23 @@ namespace DOL.GS
         /// </summary>
         private void CallTarget(GameLiving[] participants, long now)
         {
-            if (_target == null || now - _targetProgressTick < CallTargetAfterMilliseconds || now < _nextTargetCall) return;
+            if (_target == null || now < _nextTargetCall) return;
+            // A target losing health slowly to a handful while the raid stands round it is called too: Galladoria's
+            // Guardian Earthmender (60,000 health, stationary) went from 100% to 73% in 11 minutes with 20-190 raiders
+            // within 1,000 and 1-7 of them on it, and the no-damage call never came (run 22). Idle raiders only.
+            bool thin = false;
+            if (now - _targetProgressTick < CallTargetAfterMilliseconds)
+            {
+                int onIt = 0, around = 0;
+                foreach (GameLiving p in participants)
+                {
+                    if (!p.IsAlive || p.CurrentRegionID != _target.CurrentRegionID) continue;
+                    if (p.TargetObject == _target) onIt++;
+                    if (p.IsWithinRadius(_target, 1500)) around++;
+                }
+                thin = onIt < ThinAttackTargeting && around >= ThinAttackNear;
+                if (!thin) return;
+            }
             _nextTargetCall = now + 30_000;
             int called = 0;
             // After three idle minutes the call also takes raiders already fighting the encounter's trash: in
@@ -503,9 +557,23 @@ namespace DOL.GS
             { Complete = true; Status = "Final encounter defeated"; }
         }
 
+        // Run 21 (2026-10-17): 70+ raiders fought Spindler Broodmother for over 30 minutes and nothing showed how she
+        // fared. Once a minute: the current target's health, whether it is in combat, and the raiders around it.
+        private long _nextTargetStatusLog;
+
         public void Advance(GameLiving[] participants, long now)
         {
             AdvanceCore(participants, now);
+            GameNPC target = _target;
+            if (target != null && target.IsAlive && now >= _nextTargetStatusLog)
+            {
+                _nextTargetStatusLog = now + 60_000;
+                int near = participants.Count(p => p.IsAlive && p.CurrentRegionID == target.CurrentRegionID && p.IsWithinRadius(target, 1_000));
+                int onIt = participants.Count(p => p.IsAlive && p.TargetObject == target);
+                log.Info($"REALM_EXPEDITION_TARGET_STATUS region={_region} target=\"{target.Name}\" level={target.Level} " +
+                         $"health={target.HealthPercent}% inCombat={target.InCombat} raidersWithin1000={near} targeting={onIt} " +
+                         $"at={target.X},{target.Y},{target.Z} spawnDistance={(int)target.GetDistanceTo(target.SpawnPoint)}");
+            }
             if (!Hold || Complete) { _holdSince = 0; return; }
             if (_holdSince == 0) { _holdSince = now; return; }
             if (now - _holdSince < HoldReportMilliseconds || now < _nextHoldLog) return;
@@ -536,7 +604,7 @@ namespace DOL.GS
             if (finalDeaths) { Complete = true; Status = "Final encounter defeated"; return; }
             if (_target?.IsAlive == true && _target.ObjectState == GameObject.eObjectState.Active)
             {
-                if (_target.HealthPercent < _targetLowestHealth) { _targetLowestHealth = _target.HealthPercent; _targetProgressTick = now; }
+                if (_target.Health < _targetLowestHealth) { _targetLowestHealth = _target.Health; _targetProgressTick = now; }
                 ReportHealthJump(participants, now);
                 // The no-damage clock runs only while the raid is actually at its target. A raid
                 // wiped or regrouping elsewhere skipped Prince Ba'alorien and Princess Nahemah at
@@ -580,6 +648,17 @@ namespace DOL.GS
                 // formed parties" for eight hours (2026-10-12). After a few minutes the front moves to
                 // where most raiders stand, and the next encounter is searched from there.
                 if (_frontAbsentSince == 0) _frontAbsentSince = now;
+                // A long climb is not a stall: Caer Sidi's final staging is three proven path legs up from the raid, and
+                // the front was moved back down after three minutes with the raid still on its way (run 22).
+                if (_frontClosestFor != Front) { _frontClosestFor = Front; _frontClosest = float.MaxValue; }
+                float closestToFront = float.MaxValue;
+                foreach (GameLiving p in inside)
+                    closestToFront = Math.Min(closestToFront, Vector3.Distance(new(p.X, p.Y, p.Z), Front));
+                if (closestToFront < _frontClosest - TargetApproachStepUnits)
+                {
+                    _frontClosest = closestToFront;
+                    _frontAbsentSince = now;
+                }
                 if (now - _frontAbsentSince >= FrontRegroupMilliseconds && TryRegroupFront(inside, out Vector3 regrouped))
                 {
                     log.Warn($"REALM_EXPEDITION_FRONT_REGROUP region={_region} from={(int)Front.X},{(int)Front.Y},{(int)Front.Z} " +
@@ -597,18 +676,23 @@ namespace DOL.GS
             Zone zone = WorldMgr.GetRegion(_region)?.GetZone((int)Front.X, (int)Front.Y);
             if (zone == null || !nav.IsAvailable || !nav.HasNavmesh(zone))
             { Hold = true; Status = "Blocked: dungeon navigation unavailable"; return; }
+            GameNPC[] encounters = live.Where(n => n is IGameEpicNpc && n.IsAlive && n.ObjectState == GameObject.eObjectState.Active).ToArray();
             GameNPC[] candidates = live.Where(n => n.IsAlive && n.ObjectState == GameObject.eObjectState.Active && n.Realm == eRealm.None &&
                 n.Level > 0 && n is not GameBot && n is not GameSummonedPet && n.Brain is not IControlledBrain &&
                 n is not GameMerchant && n is not GameTrainer && n is not GameTeleporter && n is not GameTaxi &&
                 (n.Flags & (GameNPC.eFlags.PEACE | GameNPC.eFlags.CANTTARGET)) == 0 && !_cleared.Contains(n) &&
+                // A pet class's charm body (a copy of an overland monster it is charming) is no dungeon monster: a
+                // Hibernian raid stood four minutes by a "grogan" in Galladoria that none of it could attack (run 22).
+                n.TempProperties.GetProperty<bool>(AutonomousPetSupport.SyntheticCharmPetProperty) != true &&
+                !IsEncounterHazard(n) &&
                 !(n is IGameEpicNpc && _clearedNames.Contains(n.Name) && !_finalTypes.Contains(n.GetType().Name)) &&
                 // A neutral expedition goes for its named encounters only; monsters on the way are
                 // fought when they attack (Darkness Falls holds 2,465 spawns).
                 (_objectives == null ? now - _routeStartTick < EpicTrashPhaseMilliseconds || n is IGameEpicNpc || _finalTypes.Contains(n.GetType().Name) ||
-                        IsEncounterAdd(n, Front)
+                        IsEncounterAdd(n, Front, encounters)
                     : RealmRaidNeutralEvents.IsObjective(_objectives, n.Name)))
                 .OrderBy(n => _finalTypes.Contains(n.GetType().Name) ? 1 : 0)
-                .ThenBy(n => IsEncounterAdd(n, Front) ? 0 : 1)
+                .ThenBy(n => IsEncounterAdd(n, Front, encounters) ? 0 : 1)
                 .ThenBy(n => Vector3.DistanceSquared(Front, new(n.X, n.Y, n.Z))).ToArray();
             // Probe from the front and from where the parties actually stand, near or far:
             // Tuscaran's front once sat on a pad under the floor its parties stood on.
@@ -661,7 +745,7 @@ namespace DOL.GS
                 if (IsOutOfRangedReach(npc.Flags, npc.Z, (int)approach.Z))
                 { _routeRetry[npc] = now + BlockedTargetRetryMilliseconds; continue; }
                 _target = npc; Front = Destination = approach; TargetName = npc.Name; TargetLevel = npc.Level;
-                _targetProgressTick = _targetStartTick = now; _targetLowestHealth = npc.HealthPercent;
+                _targetProgressTick = _targetStartTick = now; _targetLowestHealth = npc.Health;
                 _targetClosest = float.MaxValue; _targetApproachTick = now;
                 _probeCursor = 0; _blockedSince = 0;
                 Hold = false; Status = "Clearing " + npc.Name; return;

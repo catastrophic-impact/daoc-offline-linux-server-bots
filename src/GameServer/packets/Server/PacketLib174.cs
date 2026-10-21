@@ -517,7 +517,7 @@ namespace DOL.GS.PacketHandler
 						pak.WriteByte((byte)item.SlotPosition);
 
 						ushort model = (ushort)(item.Model & 0x1FFF);
-						int texture = (item.Emblem != 0) ? item.Emblem : item.Color;
+						int texture = AutonomousBotGuilds.Texture(living, item); // guild emblem on a bot's cloak and shield
 
 						if ((texture & ~0xFF) != 0)
 							model |= 0x8000;

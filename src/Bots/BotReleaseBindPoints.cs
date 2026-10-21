@@ -37,6 +37,12 @@ namespace DOL.GS
                 System.Math.Abs((long)z - bind.Point.Z) <= 128 &&
                 System.Math.Pow((double)x - bind.Point.X, 2) + System.Math.Pow((double)y - bind.Point.Y, 2) <= 96 * 96);
 
+        /// <summary>True within <paramref name="clearance"/> of any bindstone of the region (its collision is not in the navmesh).</summary>
+        public static bool IsNearBindstone(ushort region, float x, float y, float z, float clearance) =>
+            Regions.TryGetValue(region, out Bind[] points) &&
+            points.Any(bind => System.Math.Abs(z - bind.Point.Z) <= 200 &&
+                (x - bind.Point.X) * (x - bind.Point.X) + (y - bind.Point.Y) * (y - bind.Point.Y) <= clearance * clearance);
+
         public static Point3D? Resolve(IPathfindingMgr nav, Zone zone, Vector3 anchor)
         {
             if (zone == null) return null;

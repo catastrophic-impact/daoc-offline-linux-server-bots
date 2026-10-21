@@ -31,6 +31,10 @@ public static class RealmRaidStaging
     {
         staging = default;
         if (slot < 0 || slot >= RealmRaidRecruitmentPolicy.MaximumParties || nav == null || zone == null || !nav.IsAvailable || !nav.HasNavmesh(zone)) return false;
+        // Posts on the ground the route planner places the lair on (its zone road areas). Hibernia's post 6 lay on
+        // ground the planner took for another area, so the party's route led out through Shannon Estuary and no zone
+        // step reached the post (route audit 2026-10-18).
+        int? lairArea = AutonomousZoneRoads.AreaAt(zone, home);
         for (int attempt = 0; attempt < 36; attempt++)
         {
             double angle = (attempt * 47.5 + slot * 137.5) * Math.PI / 180;
@@ -38,6 +42,7 @@ public static class RealmRaidStaging
             var raw = home + new Vector3((float)Math.Cos(angle) * radius, (float)Math.Sin(angle) * radius, 0);
             var floor = nav.GetClosestPoint(zone, raw, 96, 96, 4096, nav.DefaultFilters);
             if (!floor.HasValue || Math.Abs(floor.Value.Z - home.Z) > 768 ||
+                lairArea.HasValue && AutonomousZoneRoads.AreaAt(zone, floor.Value) is int area && area != lairArea.Value ||
                 occupied.Any(p => Vector3.DistanceSquared(p, floor.Value) < 600 * 600) ||
                 !AutonomousRendezvousNavigation.HasLocalExit(nav, zone, floor.Value) ||
                 !AutonomousZonePointApproach.TryResolve(nav, zone, floor.Value, home, 300, out _) ||

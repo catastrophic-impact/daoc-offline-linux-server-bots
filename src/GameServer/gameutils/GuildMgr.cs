@@ -59,6 +59,31 @@ namespace DOL.GS
             }
         }
 
+        /// <summary>A gamebot member's entry (AutonomousBotGuilds; keyed "bot:id", never a character ObjectId).</summary>
+        public static void AddBotToGuildMemberViews(Guild guild, GuildMemberView view)
+        {
+            if (guild == null || view == null)
+                return;
+
+            lock (_lock)
+            {
+                if (_guildMemberViews.TryGetValue(guild, out Dictionary<string, GuildMemberView> value))
+                    value[view.InternalID] = view;
+            }
+        }
+
+        public static void RemoveBotFromGuildMemberViews(Guild guild, string viewId)
+        {
+            if (guild == null || string.IsNullOrEmpty(viewId))
+                return;
+
+            lock (_lock)
+            {
+                if (_guildMemberViews.TryGetValue(guild, out Dictionary<string, GuildMemberView> value))
+                    value.Remove(viewId);
+            }
+        }
+
         public static Dictionary<string, GuildMemberView> GetGuildMemberViews(Guild guild)
         {
             if (guild == null)
@@ -125,6 +150,11 @@ namespace DOL.GS
             if (string.IsNullOrEmpty(guildName))
                 return false;
 
+            // Its gamebot members leave first (their entries and saved memberships go with the guild).
+            Guild disbanding = GetGuildByName(guildName);
+            AutonomousBotGuilds.OnGuildDeleted(disbanding);
+            GamePlayer[] onlineMembers = disbanding?.GetListOfOnlineMembers().ToArray() ?? [];
+
             lock (_lock)
             {
                 Guild guild = GetGuildByName(guildName);
@@ -155,6 +185,8 @@ namespace DOL.GS
                 RemoveGuild(guild);
             }
 
+            foreach (GamePlayer member in onlineMembers)
+                AutonomousBotGuilds.PresentCompanions(member);
             return true;
         }
 
@@ -181,6 +213,7 @@ namespace DOL.GS
                     player.GuildName = newName;
             }
 
+            AutonomousBotGuilds.OnGuildAppearanceChanged(GetGuildByName(newName));
             return true;
         }
 
@@ -239,6 +272,10 @@ namespace DOL.GS
                 foreach (GamePlayer member in player.Guild.GetListOfOnlineMembers())
                     RefreshPersonalHouseEmblem(member, guild);
             }
+
+            // Gamebot members and members' companions wear the new emblem at once.
+            if (guild.Emblem == newEmblem)
+                AutonomousBotGuilds.OnGuildAppearanceChanged(guild);
         }
 
         public static void RefreshPersonalHouseEmblem(GamePlayer player)

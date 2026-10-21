@@ -193,6 +193,28 @@ public class UT_AutonomousSummonPolicy
         Assert.That(AnimistSingleTargetPolicy.AppliesTo(bot), Is.True);
     }
 
+    private sealed class CapitalRegion : Region { public CapitalRegion() : base(null) { } public override bool IsCapitalCity => true; }
+
+    // Known issues #4 (2026-10-16): Animist bots planted mushrooms in cities and towns, and between fights.
+    [Test] public void AnimistsPlantNoShroomInATownOrWithoutAFight()
+    {
+        var bot = Owner();
+        var shroom = new Spell(new DbSpell { Type = eSpellType.SummonAnimistFnF.ToString(), Radius = 350, Target = "Self" }, 20);
+        var bolt = new Spell(new DbSpell { Type = eSpellType.DirectDamage.ToString(), Target = "Enemy" }, 20);
+        Assert.That(BotAnimistPolicy.MayPlant(bot, shroom), Is.True, "Outside a town");
+        bot.CurrentRegion = (Region)RuntimeHelpers.GetUninitializedObject(typeof(CapitalRegion));
+        Assert.That(BotAnimistPolicy.IsInTown(bot), Is.True);
+        Assert.That(BotAnimistPolicy.MayPlant(bot, shroom), Is.False, "No shroom in a capital city");
+        Assert.That(BotAnimistPolicy.MayPlant(bot, bolt), Is.True, "Other spells are unaffected");
+        bot.Class = new ClassCabalist();
+        Assert.That(BotAnimistPolicy.MayPlant(bot, shroom), Is.True, "Only Animist bots are limited");
+        bot.Class = new ClassAnimist();
+        bot.CurrentRegion = null;
+        long next = 0;
+        Assert.That(BotAnimistPolicy.Maintain(bot, null, ref next, out _), Is.False, "Nothing is planted between fights");
+        Assert.That(next, Is.Zero);
+    }
+
     [TestCase("moving")] [TestCase("stable")] [TestCase("return")] [TestCase("sitting")]
     public void TravelAndRestNeverPlantEvenWhenTargetIsHostile(string mode)
     {

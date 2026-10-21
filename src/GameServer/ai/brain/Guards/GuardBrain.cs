@@ -39,9 +39,7 @@ namespace DOL.AI.Brain
 					continue;
 				if ((npc.Flags & GameNPC.eFlags.FLYING) != 0)
 					continue;
-				// A classic quest's monster is the player's fight (the guards who stole Camelot's battle plans in
-				// List of Denial appear inside the city): the town guards do not take it from them.
-				if (DOL.GS.Quests.ClassicQuests.IsQuestMonster(npc))
+				if (LeavesToPlayer(DOL.GS.Quests.ClassicQuests.IsQuestMonster(npc), npc.GetDistanceTo(npc.SpawnPoint)))
 					continue;
 
 				AddToAggroList(npc);
@@ -49,6 +47,17 @@ namespace DOL.AI.Brain
 				return;
 			}
 		}
+
+		/// <summary>A classic quest monster this close to its own spawn is at home.</summary>
+		public const int QuestMonsterHomeRadius = 3000;
+
+		/// <summary>
+		/// A classic quest's monster at home is the player's fight (the guards who stole Camelot's battle plans in
+		/// List of Denial appear inside the city): the town guards do not take it from them. One far from home is
+		/// fought, as the Vindsaul gate guards fought Fjall and his friends on their runs from the fenrir fort.
+		/// </summary>
+		public static bool LeavesToPlayer(bool isQuestMonster, int distanceFromItsSpawn) =>
+			isQuestMonster && distanceFromItsSpawn <= QuestMonsterHomeRadius;
 
 		/// <summary>
 		/// We override this because we want guards to attack even gray npcs

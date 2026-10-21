@@ -35,6 +35,7 @@ namespace DOL.GS
             public readonly Dictionary<(Edge Edge, int Height), AutonomousZoneBoundaryRouting.Step[]> Samples = new();
             public readonly Dictionary<Edge, SeamStep[]> SeamSteps = new();
             public readonly Dictionary<Edge, SeamStep[][]> SeamAreas = new();
+            public readonly Dictionary<Edge, SeamStep[][]> SeamPairAreas = new();
             public readonly ushort RegionId;
             public readonly bool Seams;
             public Topology(IReadOnlyList<Zone> zones, ushort regionId = 0)
@@ -153,9 +154,12 @@ namespace DOL.GS
         }
 
         public static bool TryNextStep(Region region, Zone from, Zone to, Vector3 start, Vector3 goal,
-            IPathfindingMgr nav, out AutonomousZoneBoundaryRouting.Step step, Func<Zone, bool> allowed = null)
+            IPathfindingMgr nav, out AutonomousZoneBoundaryRouting.Step step, Func<Zone, bool> allowed = null,
+            [System.Runtime.CompilerServices.CallerMemberName] string caller = "",
+            [System.Runtime.CompilerServices.CallerFilePath] string callerFile = "")
         {
             long profiled = NavQueryProfile.Start();
+            _stepDepth++;
             try
             {
                 // A failed step is a run of corridor proofs (1-3 s on long borders); the same start
@@ -184,8 +188,14 @@ namespace DOL.GS
                 FailedSteps[key] = now + FailedStepMemoryMilliseconds;
                 return false;
             }
-            finally { NavQueryProfile.Stop(NavQueryProfile.Kind.ZoneStep, profiled); }
+            finally
+            {
+                NavQueryProfile.Stop(NavQueryProfile.Kind.ZoneStep, profiled);
+                if (--_stepDepth == 0) NavQueryProfile.NoteSite(callerFile, caller, profiled);
+            }
         }
+
+        [ThreadStatic] private static int _stepDepth;
 
         public static long RememberedSteps => SolvedSteps.Count + FailedSteps.Count;
 
@@ -246,13 +256,13 @@ namespace DOL.GS
         /// region (no region-specific road staging), with a trace of every edge and candidate tried.
         /// </summary>
         public static bool ProbeNextStep(IReadOnlyList<Zone> zones, ushort regionId, Zone from, Zone to, Vector3 start, Vector3 goal,
-            IPathfindingMgr nav, out AutonomousZoneBoundaryRouting.Step step, List<string> trace)
+            IPathfindingMgr nav, out AutonomousZoneBoundaryRouting.Step step, List<string> trace, Func<Zone, bool> allowed = null)
         {
             _probeTrace = trace;
             try
             {
                 AutonomousNavigationSurface.TryFloor(nav, from, start, out start);
-                return TryNextStep(new Topology(zones, regionId), from, to, start, goal, nav, out step, null);
+                return TryNextStep(new Topology(zones, regionId), from, to, start, goal, nav, out step, allowed);
             }
             finally { _probeTrace = null; }
         }
@@ -278,11 +288,18 @@ namespace DOL.GS
             // border for good, so a chain whose first border is shared with a dead-end chain was never
             // tried: Shannon Estuary reaches the main Sheeroe Hills ground only through Lough Gur and
             // Bog of Cullen, but Shannon>Lough Gur was spent on the Lough Gur>Sheeroe ridge (2026-10-13).
+            // An area chain that leaves a zone and comes back to it ([212>214>212>211]) is tried after the plain zone chains:
+            // the bot's ground comes from the nearest road anchor, and a bot on Breifine's main ground, taken for a ledge,
+            // was sent back to Emain Macha and from there into Breifine again, over and over, on the way to Dun Lamfhota
+            // (route audit 2026-10-18). If the bot really stands on a ledge, the plain chains fail and the loop is taken.
+            Zone[] deferredLoop = null;
             if (seamsOnly)
             {
                 Zone[] grounded = FindAreaRoute(topology, from, to, start, goal, allowed);
                 _probeTrace?.Add($"route areas [{string.Join(">", grounded.Select(z => z.ID))}]");
-                if (grounded.Length >= 2 && grounded.Length <= 32 && TryGetSharedEdge(from, grounded[1], out Edge first))
+                if (grounded.Length >= 2 && grounded.Length <= 32 && grounded.Distinct().Count() < grounded.Length)
+                    deferredLoop = grounded;
+                else if (grounded.Length >= 2 && grounded.Length <= 32 && TryGetSharedEdge(from, grounded[1], out Edge first))
                 {
                     string chain = string.Join(">", grounded.Select(z => z.ID));
                     if (nav.HasNavmesh(first.To) && TryEdgeStep(topology, first, grounded, start, goal, nav, out step)) return true;
@@ -296,11 +313,18 @@ namespace DOL.GS
             {
                 Zone[] route = FindZoneRoute(topology, from, to, excluded, allowed, seamsOnly);
                 _probeTrace?.Add($"route seamsOnly={seamsOnly} [{string.Join(">", route.Select(z => z.ID))}]");
-                if (route.Length < 2 || route.Length > 32) return false;
+                if (route.Length < 2 || route.Length > 32) break;
                 TryGetSharedEdge(from, route[1], out Edge edge);
                 string chain = string.Join(">", route.Select(z => z.ID));
                 if (!failed.Contains(chain) && nav.HasNavmesh(edge.To) && TryEdgeStep(topology, edge, route, start, goal, nav, out step)) return true;
                 excluded.Add(edge);
+                failed.Add(chain);
+            }
+            if (deferredLoop != null && TryGetSharedEdge(from, deferredLoop[1], out Edge loopEdge))
+            {
+                _probeTrace?.Add($"deferred loop [{string.Join(">", deferredLoop.Select(z => z.ID))}]");
+                string chain = string.Join(">", deferredLoop.Select(z => z.ID));
+                if (nav.HasNavmesh(loopEdge.To) && TryEdgeStep(topology, loopEdge, deferredLoop, start, goal, nav, out step)) return true;
                 failed.Add(chain);
             }
             return false;
@@ -328,6 +352,7 @@ namespace DOL.GS
             // Only crossings whose far-side ground continues, area by area, along the planned zone
             // chain (seam file area ids; several separate real networks share some borders).
             SeamStep[][] areas = SeamAreas(topology, edge, nav);
+            List<AutonomousZoneBoundaryRouting.Step> fallbackSeams = null;
             if (areas != null)
             {
                 // At most two per near-side area, best area first: crossings of one area share the
@@ -366,6 +391,31 @@ namespace DOL.GS
                     candidates.Add(pick.First.Step);
                     if (pick.Second.HasValue && candidates.Count < SeamCandidates) candidates.Add(pick.Second.Value.Step);
                 }
+                // Last of all, after every crossing tried before (so no route that worked changes), the two best of each
+                // near/far ground pair not picked above.
+                if (SeamPairAreas(topology, edge, nav) is { } pairs)
+                {
+                    var extra = new List<(float Score, SeamStep Step)>();
+                    foreach (SeamStep[] group in pairs)
+                    {
+                        if (group.Length == 0 || !(reaches.TryGetValue(group[0].OutsideArea, out bool known) ? known
+                                : reaches[group[0].OutsideArea] = ChainContinues(topology, route, group[0].OutsideArea))) continue;
+                        if (!reachesMain.TryGetValue(group[0].OutsideArea, out bool? main))
+                            reachesMain[group[0].OutsideArea] = main = ChainReachesMain(topology, route, group[0].OutsideArea);
+                        if (main == false) continue;
+                        SeamStep? best = null, next = null; float bestScore = float.MaxValue, nextScore = float.MaxValue;
+                        foreach (SeamStep s in group)
+                        {
+                            float score = Vector3.DistanceSquared(start, s.Step.Inside) + Vector3.DistanceSquared(s.Step.Outside, goal);
+                            if (score < bestScore) { next = best; nextScore = bestScore; best = s; bestScore = score; }
+                            else if (score < nextScore) { next = s; nextScore = score; }
+                        }
+                        if (best.HasValue && !candidates.Contains(best.Value.Step)) extra.Add((bestScore, best.Value));
+                        if (next.HasValue && !candidates.Contains(next.Value.Step)) extra.Add((nextScore, next.Value));
+                    }
+                    extra.Sort((a, b) => a.Score.CompareTo(b.Score));
+                    fallbackSeams = extra.Take(SeamCandidates).Select(pick => pick.Step.Step).ToList();
+                }
             }
             int preferred = candidates.Count;
             if (Resolve(edge.At(coordinate, start.Z), out var direct)) candidates.Add(direct);
@@ -377,11 +427,11 @@ namespace DOL.GS
             // even though the mesh had a valid crossing farther along the
             // border.  This is only reached when a boundary step is first
             // planned; the selected step is then retained by the mover.
-            int index = 0;
-            foreach (var candidate in candidates.Take(preferred).Concat(candidates.Skip(preferred)
-                         .OrderBy(p => Vector3.DistanceSquared(start, p.Inside) + Vector3.DistanceSquared(p.Outside, goal))))
+            foreach (var (candidate, listed) in candidates.Take(preferred).Select(c => (c, true)).Concat(candidates.Skip(preferred)
+                         .OrderBy(p => Vector3.DistanceSquared(start, p.Inside) + Vector3.DistanceSquared(p.Outside, goal))
+                         .Select(c => (c, false)))
+                         .Concat((fallbackSeams ?? []).Select(c => (c, true))))
             {
-                bool listed = index++ < preferred;
                 // With seam data an unlisted crossing takes the area of the listed point at the same
                 // spot: none means it is not on real ground, and passing through, its ground must
                 // continue along the zone chain. Checked first: data lookups, no corridor proofs.
@@ -536,6 +586,22 @@ namespace DOL.GS
             return grouped;
         }
 
+        /// <summary>
+        /// The listed crossings grouped by the ground on both sides (cached): the fallback picks after the per-area ones.
+        /// At Vindsaul Faste every crossing from Yggdra Forest starts on the same ground, and the two best of that group
+        /// led into sealed tower rooms on the West Svealand side, so its main ground was never tried (2026-10-18 probe).
+        /// </summary>
+        private static SeamStep[][] SeamPairAreas(Topology topology, Edge edge, IPathfindingMgr nav)
+        {
+            if (!topology.Seams) return null;
+            lock (topology.SeamPairAreas)
+                if (topology.SeamPairAreas.TryGetValue(edge, out var cached)) return cached;
+            SeamStep[] steps = SeamSteps(topology, edge, nav);
+            SeamStep[][] grouped = steps?.GroupBy(s => (s.InsideArea, s.OutsideArea)).Select(g => g.ToArray()).ToArray();
+            lock (topology.SeamPairAreas) topology.SeamPairAreas[edge] = grouped;
+            return grouped;
+        }
+
         /// <summary>The listed real-ground crossings of a border, snapped to the meshes once and cached.</summary>
         private static SeamStep[] SeamSteps(Topology topology, Edge edge, IPathfindingMgr nav)
         {
@@ -659,7 +725,8 @@ namespace DOL.GS
                     // here incorrectly rejected short gate/seam approaches.
                     if ((result.Status == PathfindingStatus.PathFound ||
                          result.Status == PathfindingStatus.PartialPathFound) &&
-                        Vector3.DistanceSquared(last, end) <= 48 * 48) return true;
+                        Vector3.DistanceSquared(last, end) <= 48 * 48)
+                        return result.Status == PathfindingStatus.PathFound || NearEndReachable(nav, zone, last, end);
                     // A verified winding corridor may briefly move away from
                     // its goal or finish a short segment. Detect actual stalls
                     // and cycles instead of imposing straight-line progress.
@@ -672,6 +739,20 @@ namespace DOL.GS
                 return false;
             }
             finally { ArrayPool<WrappedPathfindingNode>.Shared.Return(nodes); }
+        }
+
+        /// <summary>
+        /// A partial path that stops within 48 units of its end counts as complete only when nothing but open floor
+        /// lies between: Vindsaul Faste's ground on the Yggdra Forest seam is a strip 48 units wide along a tower wall,
+        /// and a crossing point snapped 15-35 units past the wall (inside the sealed tower room) passed as
+        /// reachable. Bots walked into the wall there and gave up 74 times in one evening (2026-10-17).
+        /// </summary>
+        private static bool NearEndReachable(IPathfindingMgr nav, Zone zone, Vector3 last, Vector3 end)
+        {
+            const float Reached = 8;
+            if (Vector2.DistanceSquared(new(last.X, last.Y), new(end.X, end.Y)) <= Reached * Reached) return true;
+            Vector3? moved = nav.GetMoveAlongSurface(zone, last, end, nav.DefaultFilters);
+            return moved == null || Vector2.DistanceSquared(new(moved.Value.X, moved.Value.Y), new(end.X, end.Y)) <= Reached * Reached;
         }
 
         private static bool Contains(Zone zone, Vector3 p)

@@ -20,6 +20,20 @@ public sealed partial class AutonomousWorldBotController
     private long _darknessFallsNextExitProbeTick;
     private int _darknessFallsExitCandidateWindow;
     private long _darknessFallsNextNearbyCampProbeTick;
+    private string _darknessFallsRaidChainFailKey;
+    private Vector3 _darknessFallsRaidChainFailPosition;
+    private long _darknessFallsRaidChainRetryTick;
+
+    /// <summary>
+    /// A raid member that could not join its realm's chain from where it stands waits this long (or until it has
+    /// moved <see cref="RaidChainRetryDistance"/>) before trying again. A failed join tests a strict leg to every
+    /// chain waypoint (~300 path queries, 1-3 s); 108 Hibernian Prince Abdin raiders repeated it on every AI turn on
+    /// 2026-10-16 and players rubberbanded.
+    /// </summary>
+    public const long RaidChainRetryMilliseconds = 30_000;
+    public const float RaidChainRetryDistance = 256;
+    /// <summary>The nearest chain waypoints a raid member tests when it joins the chain.</summary>
+    public const int RaidChainJoinCandidates = 32;
 
     /// <summary>Ordinary DF grinds use the exact spawn's ordered, realm-specific
     /// native route legs. Never ask Detour for one long 256-node partial route
@@ -267,15 +281,25 @@ public sealed partial class AutonomousWorldBotController
         string key = $"raid:{bot.Realm}:{(int)post.X >> 6}:{(int)post.Y >> 6}:{(int)post.Z >> 6}";
         if (!string.Equals(_darknessFallsRouteKey, key, StringComparison.Ordinal))
         {
+            long now = GameLoop.GameLoopTime;
+            if (!AutonomousDarknessFallsRoutePlan.ShouldRetryJoin(_darknessFallsRaidChainFailKey, key,
+                    _darknessFallsRaidChainFailPosition, current, now, _darknessFallsRaidChainRetryTick, RaidChainRetryDistance))
+                return false;
             if (AutonomousDarknessFallsNavigation.HasStrictSegment(nav, zone, current, post)) return false;
             if (!RealmRaidDungeonRoute.TryDarknessFallsChain(nav, zone, bot.Realm, post, out Vector3[] chain) ||
-                !StartDarknessFallsRoute(bot, key, chain))
+                !StartDarknessFallsRoute(bot, key, chain, RaidChainJoinCandidates))
+            {
+                _darknessFallsRaidChainFailKey = key;
+                _darknessFallsRaidChainFailPosition = current;
+                _darknessFallsRaidChainRetryTick = now + RaidChainRetryMilliseconds;
                 return false;
+            }
+            _darknessFallsRaidChainFailKey = null;
         }
         return AdvanceDarknessFallsRoute(bot, status);
     }
 
-    private bool StartDarknessFallsRoute(GameBot bot, string key, Vector3[] waypoints)
+    private bool StartDarknessFallsRoute(GameBot bot, string key, Vector3[] waypoints, int maxLegs = int.MaxValue)
     {
         Zone zone = bot.CurrentZone;
         IPathfindingMgr nav = PathfindingProvider.Instance;
@@ -283,7 +307,7 @@ public sealed partial class AutonomousWorldBotController
             !nav.HasNavmesh(zone) ||
             !AutonomousDarknessFallsRoutePlan.TryRejoin(new(bot.X, bot.Y, bot.Z), waypoints,
                 (from, to) => AutonomousDarknessFallsNavigation.HasStrictSegment(nav, zone, from, to),
-                out int cursor)) return false;
+                out int cursor, maxLegs)) return false;
         ActivateDarknessFallsRoute(bot, key, waypoints, cursor);
         return true;
     }

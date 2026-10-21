@@ -2389,9 +2389,8 @@ namespace DOL.GS
             else
                 base.TakeDamage(source, damageType, damageAmount, criticalAmount);
         }
-        public override void StartAttack(GameObject target)
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         public override bool HasAbility(string keyName)
         {
             if (IsAlive && keyName == GS.Abilities.CCImmunity)
@@ -2461,9 +2460,8 @@ namespace DOL.AI.Brain
             get { return randomtarget; }
             set { randomtarget = value; }
         }
-        public override void AttackMostWanted()
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         public int CastHeal(ECSGameTimer timer)
         {
             GameObject oldTarget = Body.TargetObject;
@@ -2483,7 +2481,10 @@ namespace DOL.AI.Brain
             if (inRangeLiving == null)
                 inRangeLiving = new List<GameNPC>();
 
-            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000))
+            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000) &&
+                // Run 17 (2026-10-17): the raid hit each Earthmender, the primals pulled the raiders off and the Earthmender
+                // healed to full 30 s later; all four were skipped in turn. It keeps its damage while raiders are in the room.
+                !EpicEncounterActors.AnyNearby(Body, 3000))
             {
                 Body.Health = Body.MaxHealth;
             }
@@ -2572,9 +2573,8 @@ namespace DOL.GS
                 default: return 60; // dmg reduction for rest resists
             }
         }
-        public override void StartAttack(GameObject target)
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         public override void TakeDamage(GameObject source, eDamageType damageType, int damageAmount, int criticalAmount)
         {
             // Offline raids cannot coordinate class/weapon damage puzzles or heal-on-hit rules.
@@ -2651,9 +2651,8 @@ namespace DOL.AI.Brain
             AggroLevel = 100;
             AggroRange = 500;
         }
-        public override void AttackMostWanted()
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         private GameLiving randomtarget;
         private GameLiving RandomTarget
         {
@@ -2679,7 +2678,10 @@ namespace DOL.AI.Brain
             if (inRangeLiving == null)
                 inRangeLiving = new List<GameNPC>();
 
-            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000))
+            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000) &&
+                // Run 17 (2026-10-17): the raid hit each Earthmender, the primals pulled the raiders off and the Earthmender
+                // healed to full 30 s later; all four were skipped in turn. It keeps its damage while raiders are in the room.
+                !EpicEncounterActors.AnyNearby(Body, 3000))
             {
                 Body.Health = Body.MaxHealth;
             }
@@ -2778,9 +2780,8 @@ namespace DOL.GS
             else
                 base.TakeDamage(source, damageType, damageAmount, criticalAmount);
         }
-        public override void StartAttack(GameObject target)
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         public override bool HasAbility(string keyName)
         {
             if (IsAlive && keyName == GS.Abilities.CCImmunity)
@@ -2844,9 +2845,8 @@ namespace DOL.AI.Brain
             AggroLevel = 100;
             AggroRange = 500;
         }
-        public override void AttackMostWanted()
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         private GameLiving randomtarget;
         private GameLiving RandomTarget
         {
@@ -2872,7 +2872,10 @@ namespace DOL.AI.Brain
             if (inRangeLiving == null)
                 inRangeLiving = new List<GameNPC>();
 
-            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000))
+            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000) &&
+                // Run 17 (2026-10-17): the raid hit each Earthmender, the primals pulled the raiders off and the Earthmender
+                // healed to full 30 s later; all four were skipped in turn. It keeps its damage while raiders are in the room.
+                !EpicEncounterActors.AnyNearby(Body, 3000))
             {
                 Body.Health = Body.MaxHealth;
             }
@@ -2971,9 +2974,8 @@ namespace DOL.GS
             else
                 base.TakeDamage(source, damageType, damageAmount, criticalAmount);
         }
-        public override void StartAttack(GameObject target)
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         public override bool HasAbility(string keyName)
         {
             if (IsAlive && keyName == GS.Abilities.CCImmunity)
@@ -3037,9 +3039,8 @@ namespace DOL.AI.Brain
             AggroLevel = 100;
             AggroRange = 500;
         }
-        public override void AttackMostWanted()
-        {
-        }
+        // Run 18 (2026-10-17): the Earthmenders fight back now (they never attacked, so raiders busy with the primals
+        // never turned on them and all four were skipped, leaving the Earth primal healed and Olcasgean asleep).
         private GameLiving randomtarget;
         private GameLiving RandomTarget
         {
@@ -3065,7 +3066,10 @@ namespace DOL.AI.Brain
             if (inRangeLiving == null)
                 inRangeLiving = new List<GameNPC>();
 
-            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000))
+            if (Body.InCombatInLast(30 * 1000) == false && this.Body.InCombatInLast(35 * 1000) &&
+                // Run 17 (2026-10-17): the raid hit each Earthmender, the primals pulled the raiders off and the Earthmender
+                // healed to full 30 s later; all four were skipped in turn. It keeps its damage while raiders are in the room.
+                !EpicEncounterActors.AnyNearby(Body, 3000))
             {
                 Body.Health = Body.MaxHealth;
             }

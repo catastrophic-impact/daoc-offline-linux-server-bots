@@ -34,6 +34,10 @@ public static class AutonomousPopulationController
     private static DateTime _nextRosterRefreshUtc;
     private static DateTime _nextCommandPollUtc;
     private static DateTime _nextOrphanRepairUtc;
+    // Retired bots whose command history the orphan repair has already looked at this server run. The repair re-read
+    // every retired bot's commands once a minute (thousands after test-roster rollbacks: the top database allocator
+    // in run 22's allocation trace); a retired bot's history only gains a pending delete, which the command poll runs.
+    private static readonly HashSet<long> OrphanChecked = new();
     private static volatile OfflineWorldBotRecord[] _cachedRoster = Array.Empty<OfflineWorldBotRecord>();
     private static bool _cachedEnabled;
     private static int _cachedRampMinutes;
@@ -64,6 +68,7 @@ public static class AutonomousPopulationController
         RefreshControlPlane(force: true);
         _nextCommandPollUtc = DateTime.MinValue;
         _nextOrphanRepairUtc = DateTime.MinValue;
+        lock (OrphanChecked) OrphanChecked.Clear();
         _timer = new System.Threading.Timer(Poll, null, 500, 1000);
     }
 
@@ -97,7 +102,7 @@ public static class AutonomousPopulationController
                 _nextCommandPollUtc = nowUtc.AddSeconds(3);
                 bool repairOrphans = nowUtc >= _nextOrphanRepairUtc;
                 if (repairOrphans)
-                    _nextOrphanRepairUtc = nowUtc.AddMinutes(1);
+                    _nextOrphanRepairUtc = nowUtc.AddMinutes(10);
                 QueueOwnerCommands(repairOrphans);
             }
 
@@ -336,6 +341,9 @@ public static class AutonomousPopulationController
             .SelectObjects(DB.Column("IsRetired").IsEqualTo(false))
             .OrderBy(record => record.BotId)
             .ToArray();
+        // A gamebot taken off the roster (launcher removal, retirement, test-roster rollback) leaves its guild.
+        long[] rosterIds = _cachedRoster.Select(record => record.BotId).ToArray();
+        NpcService.Instance.Post<long[]>(ids => AutonomousBotGuilds.Reconcile(ids), rosterIds);
     }
 
     private static volatile bool _populationSatisfied;
@@ -404,6 +412,9 @@ public static class AutonomousPopulationController
                      ? DOLDB<OfflineWorldBotRecord>.SelectObjects(DB.Column("IsRetired").IsEqualTo(true))
                      : Array.Empty<OfflineWorldBotRecord>())
         {
+            lock (OrphanChecked)
+                if (!OrphanChecked.Add(retired.BotId))
+                    continue;
             OfflineBotCommandRecord latest = DOLDB<OfflineBotCommandRecord>
                 .SelectObjects(DB.Column("BotId").IsEqualTo(retired.BotId))
                 .OrderByDescending(entry => entry.CommandId)
@@ -510,6 +521,7 @@ public static class AutonomousPopulationController
 
     private static void DeleteBot(long botId)
     {
+        AutonomousBotGuilds.Remove(botId, null);
         OfflineWorldBotRecord record = DOLDB<OfflineWorldBotRecord>.SelectObject(DB.Column("BotId").IsEqualTo(botId));
         if (AutonomousBotRegistry.TryGet(botId, out GameBot liveBot))
             liveBot.Delete();

@@ -367,7 +367,30 @@ public static class AutonomousStableRoutePlanner
         return null;
     }
 
+    /// <summary>
+    /// The answer depends on the realm, where the bot stands and the boarding point only, so bots standing together
+    /// share it for a while. Each proof is a chain of zone steps and a corridor (~300 ms); in run 17 (2026-10-17) it
+    /// was the second-largest cost of slow AI turns (38 s over 124 turns in 48 minutes), mostly crowds in towns.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(eRealm, ushort, int, int, int, int, int), (bool Reachable, long Until)>
+        BoardingWalks = new();
+    public const long BoardingWalkMemoryMilliseconds = 120_000;
+    public const long BoardingWalkFailureMemoryMilliseconds = 60_000;
+
     private static bool CanWalkToFirstBoardingLeg(GameBot bot, Vector3 boarding)
+    {
+        var key = (bot.Realm, bot.CurrentRegionID, (int)bot.X >> 8, (int)bot.Y >> 8, (int)bot.Z >> 8,
+            (int)boarding.X >> 5, (int)boarding.Y >> 5);
+        long now = GameLoop.GameLoopTime;
+        if (BoardingWalks.TryGetValue(key, out var known) && now < known.Until)
+            return known.Reachable;
+        bool reachable = ProveWalkToFirstBoardingLeg(bot, boarding);
+        if (BoardingWalks.Count > 20_000) BoardingWalks.Clear();
+        BoardingWalks[key] = (reachable, now + (reachable ? BoardingWalkMemoryMilliseconds : BoardingWalkFailureMemoryMilliseconds));
+        return reachable;
+    }
+
+    private static bool ProveWalkToFirstBoardingLeg(GameBot bot, Vector3 boarding)
     {
         Region region = bot.CurrentRegion;
         Zone currentZone = bot.CurrentZone;

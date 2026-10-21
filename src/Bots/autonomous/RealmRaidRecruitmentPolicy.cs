@@ -35,11 +35,30 @@ public static class RealmRaidRecruitmentPolicy
          !forced && elapsed >= AutonomousLateStartMilliseconds && present >= AutonomousLateStartMinimumPresent) &&
         landed;
 
-    public static bool DepartHub(bool alreadyDeparted, int presentBots) =>
-        alreadyDeparted || presentBots >= AutonomousMinimumPresent;
+    // 2026-10-16 (owner's session): the automatic Tuscaran rally needed 84 minutes to gather 200 at Hagall, so the one
+    // 90-minute staging clock left 6 minutes for the trip to the dungeon and it failed with 93 there. A slow hub leaves
+    // after HubPatienceMilliseconds with HubEarlyDepartureMinimum present (late arrivals join the expedition directly),
+    // and after leaving the raid always gets PostDepartureStagingMilliseconds to stage.
+    public const long HubPatienceMilliseconds = 30 * 60_000L;
+    public const int HubEarlyDepartureMinimum = 120;
+    public const long PostDepartureStagingMilliseconds = 45 * 60_000L;
+
+    public static bool DepartHub(bool alreadyDeparted, int presentBots, long elapsed = 0) =>
+        alreadyDeparted || presentBots >= AutonomousMinimumPresent ||
+        elapsed >= HubPatienceMilliseconds && presentBots >= HubEarlyDepartureMinimum;
 
     public static bool StagingExpired(bool forced, long elapsed, int present = 0, bool landed = true) =>
         !forced && elapsed >= AutonomousStagingLimitMilliseconds &&
+        !(present >= AutonomousMinimumPresent && !landed);
+
+    /// <summary>When an automatic rally's staging ends: 90 minutes after it opened, but never sooner than 45 minutes
+    /// after its parties left the hub (departedTick 0 = not yet).</summary>
+    public static long StagingDeadline(long created, long departedTick) =>
+        Math.Max(created + AutonomousStagingLimitMilliseconds,
+            departedTick > 0 ? departedTick + PostDepartureStagingMilliseconds : 0);
+
+    public static bool StagingExpired(bool forced, long now, long created, long departedTick, int present, bool landed) =>
+        !forced && now >= StagingDeadline(created, departedTick) &&
         !(present >= AutonomousMinimumPresent && !landed);
 
     public static bool BattleExpired(bool forced, long now, long deadline) => !forced && now >= deadline;

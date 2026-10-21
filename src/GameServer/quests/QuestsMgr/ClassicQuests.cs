@@ -160,6 +160,9 @@ namespace DOL.GS.Quests
             /// <summary>Rewards made per class (owner 2026-10-11): reward Id_nb -> class id -> that class's own version
             /// (Viraniel's belts, Banba's cloaks, Stoneheart weapons, Ley Infused and Trustan's belts).</summary>
             public Dictionary<string, Dictionary<string, string>> ClassRewards { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+            /// <summary>Fellows of a quest monster: fellow Mob_ID -> the leader's name (Fjall's friends; they walk and
+            /// fight with him, QuestFellowBrain).</summary>
+            public Dictionary<string, string> Fellows { get; set; } = new(StringComparer.Ordinal);
         }
 
         /// <summary>The version of a quest reward made for the player's class (ClassRewards), or the reward itself.</summary>
@@ -666,6 +669,10 @@ namespace DOL.GS.Quests
             npc != null && (npc.TempProperties.GetProperty<object>(EventSpawnProperty) != null ||
                             (!string.IsNullOrEmpty(npc.InternalID) && _config.QuestMonsterIds.Contains(npc.InternalID)));
 
+        /// <summary>The name of the quest monster a fellow walks with (classic-quests.json Fellows), or null.</summary>
+        public static string FellowLeaderName(string mobId) =>
+            !string.IsNullOrEmpty(mobId) && _config.Fellows != null && _config.Fellows.TryGetValue(mobId, out string name) ? name : null;
+
         public static bool IsQuestMonsterId(string mobId) =>
             !string.IsNullOrEmpty(mobId) && _config.QuestMonsterIds.Contains(mobId);
 
@@ -681,6 +688,7 @@ namespace DOL.GS.Quests
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (config == null) return;
                 config.QuestMonsterIds = new HashSet<string>(config.QuestMonsterIds ?? new(), StringComparer.Ordinal);
+                config.Fellows = new Dictionary<string, string>(config.Fellows ?? new(), StringComparer.Ordinal);
                 _config = config;
                 _loadedWrite = write;
                 if (Log.IsInfoEnabled)

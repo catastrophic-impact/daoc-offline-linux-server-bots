@@ -27,12 +27,37 @@ public static class AutonomousBattlegroundWave
     private sealed class Wave
     {
         public Vector3? Staging;
-        public long GatherSince, GoingSince, NextCount;
+        public long GatherSince, GoingSince, NextCount, NextTotalCount;
         public bool Going;
         public int Total, Gathered, NearKeep;
     }
 
     private static readonly ConcurrentDictionary<(ushort Region, eRealm Realm), Wave> Waves = new();
+
+    /// <summary>
+    /// Too few of the realm's bots in the battleground for any wave (fewer than <see cref="MinimumWave"/>): they roam the
+    /// field instead of the keep. The owner's 2026-10-17 session: Thidranki held 1-2 bots per realm (the roster has 47
+    /// bots of levels 20-24); they waited at the staging point for a wave of eight that never came, and single bots
+    /// that strayed into the keep's guards announced sieges that went nowhere.
+    /// </summary>
+    public static bool TooFewForAssault(eRealm realm, BattlegroundBrackets.Bracket bracket)
+    {
+        if (bracket == null) return false;
+        long now = GameLoop.GameLoopTime;
+        Wave wave = Waves.GetOrAdd((bracket.RegionId, realm), _ => new Wave { GatherSince = now });
+        lock (wave)
+        {
+            if (now >= wave.NextTotalCount)
+            {
+                wave.NextTotalCount = now + 5_000;
+                wave.Total = AutonomousBotRegistry.Snapshot().Count(other => other.IsAlive && other.Realm == realm &&
+                    other.CurrentRegionID == bracket.RegionId);
+            }
+            return IsTooFew(wave.Total);
+        }
+    }
+
+    public static bool IsTooFew(int realmBotsInside) => realmBotsInside < MinimumWave;
 
     /// <summary>A wave goes in at this many gathered: 60% of the realm's bots inside, at least <see cref="MinimumWave"/>.</summary>
     public static int WaveSize(int realmBotsInside) => Math.Max(MinimumWave, realmBotsInside * 6 / 10);

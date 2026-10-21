@@ -141,7 +141,10 @@ public sealed partial class AutonomousWorldBotController
             // No teleport, wall shortcut, or fresh cross-region chord.
             if (!bot.IsMoving) bot.WalkTo(next, bot.MaxSpeed);
         }
-        else if (!IssuePath(bot, leg, preciseArrival: leg == next))
+        // The next leg starts at once: a moving bot kept its old order, so it walked into the waypoint it had just
+        // reached, stopped there and waited for its next AI turn (2.6-4.2 s) at every waypoint of the march (run 22:
+        // 255 kept orders in five minutes).
+        else if (!IssuePath(bot, leg, preciseArrival: leg == next, retargetWhileMoving: true))
         {
             _keepHop = null;
             _keepTravelPoints = null; _keepPlanning = null;

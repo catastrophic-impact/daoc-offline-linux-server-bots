@@ -328,7 +328,9 @@ namespace DOL.GS
                 if (!floor.HasValue) { floorless++; continue; }
                 float distance = Vector3.Distance(floor.Value, at);
                 if (kind == BotSiegeKind.Ram ? distance < min || distance > max : distance < min + 50 || distance > max - 100) { band++; continue; }
-                if (engines.Any(w => Vector3.Distance(floor.Value, new(w.X, w.Y, w.Z)) < (kind == BotSiegeKind.Ram ? 120 : 400))) { crowded++; continue; }
+                // Only working engines take up a spot: wrecks left to their native decay blocked all 35 ram spots at Dun
+                // Dagda's Relic Gate after the outer gate fell (run 23).
+                if (engines.Any(w => w.Health > w.DecayedHp && Vector3.Distance(floor.Value, new(w.X, w.Y, w.Z)) < (kind == BotSiegeKind.Ram ? 120 : 400))) { crowded++; continue; }
                 if (kind == BotSiegeKind.Ballista && target.Z - floor.Value.Z <= 150 &&
                     !nav.HasLineOfSight(bot.CurrentZone, floor.Value + new Vector3(0,0,48), at + new Vector3(0,0,48), nav.DefaultFilters)) { blind++; continue; }
                 if (kind != BotSiegeKind.Ram && !LevelGround(nav, bot.CurrentZone, floor.Value)) { uneven++; continue; }

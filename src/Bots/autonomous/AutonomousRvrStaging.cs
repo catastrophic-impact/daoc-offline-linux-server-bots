@@ -78,6 +78,30 @@ public static class AutonomousRvrStaging
         return keep.RegionId != 0;
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(ushort Region, int X, int Y, long Revision), bool>
+        AnchorConnections = new();
+
+    /// <summary>
+    /// The staging point is walkable from the keep itself. Run 21 (2026-10-17): three staging points around Castle
+    /// Sauvage (583755,477974 under the rampart, 583561,477823, 583953,476231) sat on walled-off floor; warband members
+    /// who arrived by teleporter from another region were never checked against them and gave up their route 29 times.
+    /// Answered once per point (and mesh revision).
+    /// </summary>
+    public static bool IsConnectedToKeep(BorderKeep keep, Vector3 point)
+    {
+        Region region = WorldMgr.GetRegion(keep.RegionId);
+        Zone zone = region?.GetZone((int)point.X, (int)point.Y);
+        IPathfindingMgr nav = PathfindingProvider.Instance;
+        if (zone == null || zone != region.GetZone((int)keep.Position.X, (int)keep.Position.Y) || !nav.IsAvailable || !nav.HasNavmesh(zone))
+            return true; // no mesh or another zone: unchanged
+        var key = (keep.RegionId, (int)point.X >> 5, (int)point.Y >> 5, NavigationGeometryRevision.Read(zone));
+        return AnchorConnections.GetOrAdd(key, _ =>
+        {
+            Vector3? from = nav.GetClosestPoint(zone, keep.Position, 600, 600, 2_000, nav.DefaultFilters);
+            return from.HasValue && AutonomousZoneItinerary.HasCompleteCorridor(nav, zone, from.Value, point);
+        });
+    }
+
     /// <summary>
     /// Imported area centers can sit inside keep geometry rather than on a
     /// walkable courtyard polygon. Probe a deterministic set wholly inside the

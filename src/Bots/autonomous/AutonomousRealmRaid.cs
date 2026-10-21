@@ -46,6 +46,7 @@ namespace DOL.GS
             public long Created;
             public RealmRaidMuster.Hub Hub;
             public bool HubDeparted;
+            public long HubDepartedTick;
             public long NextDefenseBroadcast;
             public readonly Dictionary<int, Vector3> HubPosts = new();
             public Vector3[] OutboundSeams = [];
@@ -138,6 +139,14 @@ namespace DOL.GS
         private static long _nextForcedRecruitment;
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<long, string> Reservations = new();
         public static bool IsReserved(GameBot bot) => bot != null && Reservations.ContainsKey(bot.DatabaseID);
+
+        /// <summary>A member of a raid party whose rally has not begun its battle yet (hub, travel or staging).</summary>
+        public static bool IsInRally(GameBot bot)
+        {
+            Group group = bot?.Group;
+            if (group == null) return false;
+            lock (Sync) return Membership.TryGetValue(group, out Raid raid) && !raid.Started && raid.Parties.ContainsKey(group);
+        }
         public static bool IsReservedFor(GameBot bot, string id) => bot != null && Reservations.GetValueOrDefault(bot.DatabaseID) == id;
         public static bool IsForcedExpedition(string id)
         {
@@ -191,8 +200,10 @@ namespace DOL.GS
                     }
                     raid.Support = raid.Parties.Values.SelectMany(p => p.Members).Cast<GameLiving>().ToArray();
                     int presentAtHub = raid.Parties.Values.Sum(p => PresentAtHub(raid, p));
-                    bool departing = !raid.HubDeparted && RealmRaidRecruitmentPolicy.DepartHub(false, presentAtHub);
+                    bool departing = !raid.HubDeparted && RealmRaidRecruitmentPolicy.DepartHub(false, presentAtHub,
+                        raid.Forced ? 0 : GameLoop.GameLoopTime - raid.Created);
                     raid.HubDeparted |= departing;
+                    if (departing) raid.HubDepartedTick = GameLoop.GameLoopTime;
                     if (departing) RealmEventNotices.Queue(raid.Definition.Id, raid.Definition.Realm,
                         $"{presentAtHub} adventurers present at {raid.Hub.Name}; departing together for {raid.Definition.Name}. Late arrivals will join the expedition directly.");
                     if (raid.HubDeparted)
@@ -213,7 +224,7 @@ namespace DOL.GS
                     { End(raid, now, "The four-hour expedition window ended."); continue; }
                     if (!raid.Started)
                     {
-                        long noticeDeadline = raid.Created + RealmRaidRecruitmentPolicy.AutonomousStagingLimitMilliseconds;
+                        long noticeDeadline = RealmRaidRecruitmentPolicy.StagingDeadline(raid.Created, raid.HubDepartedTick);
                         if (!raid.Forced && RealmEventBanter.ReminderDue(raid.Started, raid.PreparationNoticeSent, noticeDeadline - now))
                         {
                             raid.PreparationNoticeSent = true;
@@ -229,7 +240,7 @@ namespace DOL.GS
                             RealmEventNotices.Queue(raid.Definition.Id, raid.Definition.Realm,
                                 $"The {raid.Definition.Name} expedition is advancing with {present} staged level-50 adventurers.");
                         }
-                        else if (RealmRaidRecruitmentPolicy.StagingExpired(raid.Forced, now - raid.Created, present, DragonLanded(raid)))
+                        else if (RealmRaidRecruitmentPolicy.StagingExpired(raid.Forced, now, raid.Created, raid.HubDepartedTick, present, DragonLanded(raid)))
                         { End(raid, now, $"Staging failed: {present} adventurers arrived; no undersized or airborne assault was ordered."); continue; }
                     }
                     if (raid.Started && raid.DungeonRoute != null)
@@ -710,11 +721,17 @@ namespace DOL.GS
                 ushort region = raid.Started ? raid.Definition.Region : route.Entrance.SourceRegion;
                 string target = raid.Started ? route.TargetName : raid.Definition.Name;
                 bool queued = false;
+                Vector3 front = destination;
                 if (raid.Started && !TryBattlePost(raid, party, destination, region, out destination))
                 {
                     queued = true;
                     region = party.Anchor.HasValue ? party.AnchorRegion : route.Entrance.SourceRegion;
                     destination = party.Anchor ?? party.Staging;
+                    // Far from the front, a party without a free post there walks to it anyway instead of waiting at its old
+                    // post: at Caer Sidi's final staging no post was free, every party waited where it stood, nobody came
+                    // near, and the front was moved back down after three minutes, twice (runs 22, 23).
+                    if (region == raid.Definition.Region && Vector3.DistanceSquared(destination, front) > QueuedApproachDistance * QueuedApproachDistance)
+                        destination = front;
                 }
                 party.DestinationView = new(raid.Definition.Id, queued ? "RAID — waiting for a clear formation post" : raid.Started ? "RAID — " + route.Status : "Raid rally",
                     new($"realm-event-{raid.Definition.Id}", target, raid.Definition.Name, region,
@@ -736,6 +753,7 @@ namespace DOL.GS
         }
 
         public const long FailedPostRetryMilliseconds = 30_000;
+        public const float QueuedApproachDistance = 2_500f;
 
         private static bool TryBattlePost(Raid raid, Party party, Vector3 center, ushort region, out Vector3 point)
         {

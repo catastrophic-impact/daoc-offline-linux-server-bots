@@ -239,8 +239,7 @@ public static class AutonomousStuckWatchdog
             return;
 
         DateTime now = nowUtc ?? DateTime.UtcNow;
-        Observation current = Capture(bot, now);
-        Observation observation = Observations.GetOrAdd(bot.DatabaseID, current);
+        Observation current = CurrentFor(bot, now, out Observation observation);
         CopyOutcomeSnapshot(observation, current);
         if (kind is eAutonomousProgressKind.Movement or eAutonomousProgressKind.StableTravel or eAutonomousProgressKind.Recovery or eAutonomousProgressKind.SiegeParticipation)
         {
@@ -317,17 +316,17 @@ public static class AutonomousStuckWatchdog
                 return RelocateToSafeCapital(bot, now, $"live position invalid: {invalidReason}", true);
         }
 
-        Observation current = Capture(bot, now);
-        Observation previous = Observations.GetOrAdd(bot.DatabaseID, current);
+        Observation current = CurrentFor(bot, now, out Observation previous);
 
         bool withHuman = bot.IsPlayerLedGroup || bot.Group?.GetPlayersInTheGroup().Count > 0;
-        GoalObservation goalObservation = GoalObservations.GetOrAdd(bot.DatabaseID, _ => new GoalObservation
-        {
-            AssignmentId = bot.PersistentRecord.ObjectiveAssignmentId ?? string.Empty,
-            Goal = bot.PersistentRecord.CurrentGoal ?? string.Empty,
-            Target = bot.PersistentRecord.TargetName ?? string.Empty,
-            LastProgressUtc = now,
-        });
+        if (!GoalObservations.TryGetValue(bot.DatabaseID, out GoalObservation goalObservation))
+            goalObservation = GoalObservations.GetOrAdd(bot.DatabaseID, new GoalObservation
+            {
+                AssignmentId = bot.PersistentRecord.ObjectiveAssignmentId ?? string.Empty,
+                Goal = bot.PersistentRecord.CurrentGoal ?? string.Empty,
+                Target = bot.PersistentRecord.TargetName ?? string.Empty,
+                LastProgressUtc = now,
+            });
         string currentGoal = bot.PersistentRecord.CurrentGoal ?? string.Empty;
         string currentTarget = bot.PersistentRecord.TargetName ?? string.Empty;
         string assignmentId = bot.PersistentRecord.ObjectiveAssignmentId ?? string.Empty;
@@ -367,7 +366,10 @@ public static class AutonomousStuckWatchdog
         // ends, both clocks restart from that point instead of inheriting wait time.
         // A bot waiting for matchmaking now grinds solo meanwhile, so it gets
         // the ordinary watchdog; a genuine freeze during that grind is caught.
+        // A raid rally has its own deadline (staging limit, at least 45 minutes after leaving the hub). 2026-10-16: the
+        // 45-minute clock sent 322 Cuuldurach raiders from their rally to Tir na Nog, so 13 reached the dragon.
         if (GroupProtectsFromWatchdog(bot, now) ||
+            AutonomousRealmRaid.IsInRally(bot) ||
             IsGroupFormationHold(bot.PersistentRecord.Activity) ||
             AutonomousObjectiveAssignments.IsIntentionalTownIdle(bot.PersistentRecord, now) &&
             AutonomousWorldBotController.IsAtAssignedIdleTown(bot))
@@ -599,18 +601,34 @@ public static class AutonomousStuckWatchdog
         return true;
     }
 
-    private static Observation Capture(GameBot bot, DateTime now) => new()
+    private static Observation Capture(GameBot bot, DateTime now) => Fill(new Observation(), bot, now);
+
+    private static Observation Fill(Observation observation, GameBot bot, DateTime now)
     {
-        RegionId = bot.CurrentRegionID,
-        X = bot.X,
-        Y = bot.Y,
-        Z = bot.Z,
-        Experience = bot.Experience,
-        RealmPoints = bot.AutonomousRealmPoints,
-        MoneyCopper = bot.PersistentRecord?.MoneyCopper ?? 0,
-        Goal = bot.PersistentRecord?.CurrentGoal ?? string.Empty,
-        LastMovementUtc = now,
-    };
+        observation.RegionId = bot.CurrentRegionID;
+        observation.X = bot.X;
+        observation.Y = bot.Y;
+        observation.Z = bot.Z;
+        observation.Experience = bot.Experience;
+        observation.RealmPoints = bot.AutonomousRealmPoints;
+        observation.MoneyCopper = bot.PersistentRecord?.MoneyCopper ?? 0;
+        observation.Goal = bot.PersistentRecord?.CurrentGoal ?? string.Empty;
+        observation.LastMovementUtc = now;
+        return observation;
+    }
+
+    // The bot's current state for comparison only (never stored): a per-thread scratch once the bot has a stored
+    // observation. A new Observation per AI turn was one of the top allocators (run 23 allocation trace).
+    [ThreadStatic] private static Observation _scratch;
+
+    private static Observation CurrentFor(GameBot bot, DateTime now, out Observation stored)
+    {
+        if (Observations.TryGetValue(bot.DatabaseID, out stored))
+            return Fill(_scratch ??= new Observation(), bot, now);
+        Observation fresh = Capture(bot, now);
+        stored = Observations.GetOrAdd(bot.DatabaseID, fresh);
+        return fresh;
+    }
 
     private static bool HasMeaningfulMovement(Observation previous, Observation current)
     {

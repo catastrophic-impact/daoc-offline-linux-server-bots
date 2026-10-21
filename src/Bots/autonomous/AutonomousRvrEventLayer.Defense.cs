@@ -62,7 +62,7 @@ namespace DOL.GS
             if (source != null && source.Realm != eRealm.None && source.Realm != keep.Realm)
             {
                 KeepCombatPressure[id] = now;
-                ObserveBattlegroundSiege(keep, source.Realm, now);
+                ObserveBattlegroundSiege(keep, source.Realm, now, PlayerInstigator(source) != null);
                 CompanionRaidSiege.ObserveKeepUnderAttack(keep);
             }
             GamePlayer player = PlayerInstigator(source);
@@ -83,9 +83,13 @@ namespace DOL.GS
         public static bool BattlegroundSiegeIsNew(long previousTick, long now) =>
             previousTick == 0 || now - previousTick >= BattlegroundSiegeQuietMilliseconds;
 
-        private static void ObserveBattlegroundSiege(AbstractGameKeep keep, eRealm attacker, long now)
+        private static void ObserveBattlegroundSiege(AbstractGameKeep keep, eRealm attacker, long now, bool playerInvolved)
         {
             if (!BattlegroundBrackets.IsBattlegroundRegion(keep.Region)) return;
+            // A stray bot of a realm too small for an assault is no siege (Thidranki, 2026-10-17: nine announced
+            // sieges in two hours by one or two bots each, none of which went anywhere). Players always count.
+            if (!playerInvolved && AutonomousBattlegroundWave.TooFewForAssault(attacker, BattlegroundBrackets.ForRegion(keep.Region)))
+                return;
             bool fresh;
             lock (BattlegroundSiegePressure)
             {

@@ -86,8 +86,12 @@ namespace DOL.GS
         }
 
         public virtual bool IsAvailable => false;
-        public virtual EDtPolyFlags[] DefaultFilters => [EDtPolyFlags.All ^ EDtPolyFlags.Disabled, 0];
-        public virtual EDtPolyFlags[] BlockingDoorAvoidanceFilters => [DefaultFilters[0], EDtPolyFlags.BlockingDoor];
+        // One shared array each (nothing writes to a filter array): the getters used to allocate a new one per path
+        // query, 21 MB in a 30 s allocation trace (2026-10-17).
+        private static readonly EDtPolyFlags[] SharedDefaultFilters = [EDtPolyFlags.All ^ EDtPolyFlags.Disabled, 0];
+        private static readonly EDtPolyFlags[] SharedBlockingDoorAvoidanceFilters = [SharedDefaultFilters[0], EDtPolyFlags.BlockingDoor];
+        public virtual EDtPolyFlags[] DefaultFilters => SharedDefaultFilters;
+        public virtual EDtPolyFlags[] BlockingDoorAvoidanceFilters => SharedBlockingDoorAvoidanceFilters;
 
         protected static void FillRecastFloats(Vector3 value, Span<float> destination)
         {

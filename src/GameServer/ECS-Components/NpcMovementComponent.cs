@@ -293,6 +293,9 @@ namespace DOL.GS
             _pathfinder.ForceReplot = true;
         }
 
+        /// <summary>The pathfinder's last result (diagnostics).</summary>
+        public PathfindingStatus LastPathfindingStatus => _pathfinder.PathfindingStatus;
+
         public bool TryConsumeAutonomousPathFailure(out PathfindingStatus status, out Vector3 destination)
         {
             status = _autonomousPathFailureStatus;
@@ -894,6 +897,14 @@ namespace DOL.GS
             if (Owner.IsCasting && !BotSongTwistPolicy.HasMobileSongCast(Owner) ||
                 (Owner.IsAttacking && Owner.ActiveWeaponSlot is eActiveWeaponSlot.Distance))
             {
+                // A party member's cast pauses its formation follow; it moves on the moment the cast ends instead of
+                // standing until its next AI turn re-issues the follow.
+                if (AutonomousGroupFormationFollow.IsFormationFollow(Owner, FollowTarget))
+                {
+                    if (IsMoving)
+                        UpdateMovement(0);
+                    return AutonomousGroupFormationFollow.FollowCheckMilliseconds;
+                }
                 StopMoving();
                 return Properties.GAMENPC_FOLLOWCHECK_TIME;
             }
@@ -912,7 +923,37 @@ namespace DOL.GS
             if (dragonReach > 0 && Owner.IsAttacking && Owner.TargetObject == FollowTarget)
                 MinFollowDistance = Math.Max(MinFollowDistance, dragonReach);
 
-            if (Owner.Brain is StandardMobBrain brain && FollowTarget.Realm == Owner.Realm)
+            // An autonomous party member keeps its formation slot around the leader (AutonomousGroupFormationFollow).
+            bool formation = AutonomousGroupFormationFollow.TryGetSlot(Owner, FollowTarget, out Vector3 formationSlot, out bool leaderWalking);
+            bool crossBorder = false;
+            if (formation)
+            {
+                targetPos = formationSlot;
+                MinFollowDistance = 0;
+                // A slot the follower cannot reach: walk behind the leader for a while instead of standing.
+                if (leaderWalking)
+                {
+                    bool slotUnreachable = !IsMoving && _pathfinder.PathfindingStatus is PathfindingStatus.PartialPathFound or PathfindingStatus.NoPathFound &&
+                        Vector3.DistanceSquared(_ownerPosition, formationSlot) > 120 * 120;
+                    if (AutonomousGroupFormationFollow.TrailLeader(Owner, slotUnreachable))
+                    {
+                        targetPos = new(FollowTarget.X, FollowTarget.Y, FollowTarget.Z);
+                        MinFollowDistance = AutonomousGroupFormationFollow.TrailLeaderDistance;
+                    }
+                }
+                // A slot over a zone border: paths are planned inside one zone, and an autonomous bot pauses on a
+                // destination in another zone, so followers stood at every border their party crossed until the slot
+                // came back into their zone. They aim at the leader instead and step over the border behind it.
+                Zone here = Owner.CurrentZone;
+                if (here != null && Owner.CurrentRegion?.GetZone((int) targetPos.X, (int) targetPos.Y) != here)
+                {
+                    targetPos = new(FollowTarget.X, FollowTarget.Y, FollowTarget.Z);
+                    MinFollowDistance = AutonomousGroupFormationFollow.TrailLeaderDistance;
+                    crossBorder = FollowTarget.CurrentZone != here;
+                    AutonomousGroupFormationFollow.NoteBorderFollow(crossBorder);
+                }
+            }
+            else if (Owner.Brain is StandardMobBrain brain && FollowTarget.Realm == Owner.Realm)
             {
                 int tx = (int) targetPos.X;
                 int ty = (int) targetPos.Y;
@@ -936,7 +977,9 @@ namespace DOL.GS
             }
 
             // The way position is updated ensures that we never move past the destination, so we need to take potential small inaccuracies into account.
-            if (distanceSquared <= (MinFollowDistance + 1) * (MinFollowDistance + 1))
+            // A formation follower of a standing leader settles within a few units of its slot instead of jittering onto it.
+            int arrived = formation && !leaderWalking ? AutonomousGroupFormationFollow.ArrivedTolerance : MinFollowDistance + 1;
+            if (distanceSquared <= arrived * arrived)
             {
                 TurnTo(FollowTarget);
 
@@ -944,7 +987,7 @@ namespace DOL.GS
                     UpdateMovement(0);
 
                 UnsetFlag(MovementState.Pathfinding); // Ensures OnArrival doesn't try to reach remaining nodes.
-                return Properties.GAMENPC_FOLLOWCHECK_TIME;
+                return formation ? AutonomousGroupFormationFollow.FollowCheckMilliseconds : Properties.GAMENPC_FOLLOWCHECK_TIME;
             }
 
             float distance = MathF.Sqrt(distanceSquared);
@@ -955,14 +998,24 @@ namespace DOL.GS
 
             short speed;
 
-            // No smoothing if the NPC is attacking and is out of melee range.
-            if (Owner.IsAttacking && distance > Owner.MeleeAttackRange)
+            // No smoothing if the NPC is attacking and is out of melee range, nor for a formation follower while its
+            // leader walks (it keeps its full speed; slowing on approach made it fall back and stop and go).
+            if (Owner.IsAttacking && distance > Owner.MeleeAttackRange || formation && leaderWalking)
                 speed = MaxSpeed;
             else
                 speed = (short) Math.Min(MaxSpeed, (distance - MinFollowDistance) * 2.5);
 
             if (TryRecoverStuckBotPet(targetPos, distance))
                 return Properties.GAMENPC_FOLLOWCHECK_TIME;
+
+            // The leader just crossed the border: walk straight after it over the last few hundred units (the ground it
+            // walked); farther than that the follower's AI turn plans the border crossing.
+            if (crossBorder && distance <= AutonomousGroupFormationFollow.BorderWalkDistance)
+            {
+                UnsetFlag(MovementState.Pathfinding);
+                WalkToInternal(destination, Math.Max((short) 20, speed));
+                return AutonomousGroupFormationFollow.FollowCheckMilliseconds;
+            }
 
             // Snap the destination to the mesh with a generous search distance. Use the follow target's position as a fallback.
             if (!TrySnapToMesh(ref destination))
@@ -971,8 +1024,14 @@ namespace DOL.GS
                 TrySnapToMesh(ref destination);
             }
 
+            // The pathfinder re-plots only when the target moved 64 units, so a formation follower that reached the end of
+            // its last path stood until its slot had moved that far (run 20: followers stood in ~10% of the checks while
+            // their leader walked). Standing while the leader walks gets a fresh path, unless the last one just failed
+            // (a slot behind a closed keep door replanned every 400 ms during a siege, 2026-10-17).
+            if (formation && leaderWalking && !IsMoving && !_pathfinder.HasRecentFailure(destination))
+                _pathfinder.ForceReplot = true;
             PathToInternal(destination, Math.Max((short) 20, speed));
-            return Properties.GAMENPC_FOLLOWCHECK_TIME;
+            return formation ? AutonomousGroupFormationFollow.FollowCheckMilliseconds : Properties.GAMENPC_FOLLOWCHECK_TIME;
         }
 
         /// <summary>

@@ -396,9 +396,24 @@ public static class AutonomousPetSupport
         if (petBrain == null && playerLike.CharacterClass?.ID == (int)eCharacterClass.Necromancer && playerLike.IsShade)
             playerLike.Shade(false);
 
-        IReadOnlyList<(Spell Spell, SpellLine Line)> spells = owner is GameBot cachedOwner && spellAllowed == null
-            ? BotAutomatedSpells(cachedOwner)
-            : KnownSpells(owner)
+        IReadOnlyList<(Spell Spell, SpellLine Line)> spells;
+        if (owner is GameBot cachedOwner)
+        {
+            // The cached upkeep list, filtered in place when the caller restricts it (no LINQ chain per AI turn).
+            var automated = BotAutomatedSpells(cachedOwner);
+            if (spellAllowed == null)
+                spells = automated;
+            else
+            {
+                var allowed = new List<(Spell Spell, SpellLine Line)>(automated.Length);
+                foreach (var entry in automated)
+                    if (spellAllowed(entry.Spell))
+                        allowed.Add(entry);
+                spells = allowed;
+            }
+        }
+        else
+            spells = KnownSpells(owner)
                 .Where(entry => spellAllowed == null || spellAllowed(entry.Spell))
                 .Where(entry => AnimistSingleTargetPolicy.AllowsAutomatedSpell(entry.Spell))
                 .ToList();
@@ -435,13 +450,7 @@ public static class AutonomousPetSupport
             if (mayCreateSyntheticCharm)
             {
                 generatedCharm = ownerClass == eCharacterClass.Sorcerer
-                    ? spells.Where(entry => entry.Spell.SpellType == eSpellType.Charm &&
-                                             CanCast(owner, entry.Spell) &&
-                                             GeneratedCharmTargetLevel(ownerClass, owner.Level) <= entry.Spell.Value)
-                        .OrderByDescending(entry => entry.Spell.Value)
-                        .ThenByDescending(entry => entry.Spell.Level)
-                        .Select(entry => entry.Spell)
-                        .FirstOrDefault()
+                    ? BestSorcererCharm(owner, spells, GeneratedCharmTargetLevel(ownerClass, owner.Level))
                     : GeneratedCharmSpells.GetOrAdd(ownerClass, _ => CreateGeneratedCharmSpell(charmProfile));
             }
             if (generatedCharm != null && now >= nextDeployablePetTick && CanCast(owner, generatedCharm) &&
@@ -461,8 +470,7 @@ public static class AutonomousPetSupport
                 nextDeployablePetTick = now + 3_000;
             }
 
-            (Spell Spell, SpellLine Line) summon = ChooseWeightedByRank(
-                spells.Where(entry => IsMainPetSummon(entry.Spell.SpellType) && CanCast(owner, entry.Spell)),
+            (Spell Spell, SpellLine Line) summon = ChooseCastableByRank(owner, spells, null,
                 owner is GameBot { IsEndgameCompanion: true });
             if (summon.Spell != null)
             {
@@ -539,13 +547,18 @@ public static class AutonomousPetSupport
             {
                 bool covenantHotRunning = characterClass == eCharacterClass.Sluaghbinder &&
                     petOwnerSpec == eSpecType.SluaghbinderCovenant && HasActiveCovenantPetHot(pet);
-                (Spell Spell, SpellLine Line) heal = spells
-                    .Where(entry => entry.Spell.IsHealing && entry.Spell.Target == eSpellTarget.PET &&
-                                    CanCast(owner, entry.Spell) &&
-                                    !ShouldSkipActiveCovenantPetHot(
-                                        characterClass, petOwnerSpec, entry.Spell, covenantHotRunning))
-                    .OrderByDescending(entry => entry.Spell.Level)
-                    .FirstOrDefault();
+                // Highest level first, the first listed among equals (a loop: the LINQ chain per turn was a top
+                // allocator in run 22's trace).
+                (Spell Spell, SpellLine Line) heal = default;
+                for (int i = 0; i < spells.Count; i++)
+                {
+                    var entry = spells[i];
+                    if (heal.Spell != null && entry.Spell.Level <= heal.Spell.Level) continue;
+                    if (entry.Spell.IsHealing && entry.Spell.Target == eSpellTarget.PET &&
+                        CanCast(owner, entry.Spell) &&
+                        !ShouldSkipActiveCovenantPetHot(characterClass, petOwnerSpec, entry.Spell, covenantHotRunning))
+                        heal = entry;
+                }
                 if (heal.Spell != null && owner.IsWithinRadius(pet, heal.Spell.CalculateEffectiveRange(owner)))
                 {
                     if (CastPreservingTarget(owner, pet, heal.Spell, heal.Line))
@@ -557,18 +570,22 @@ public static class AutonomousPetSupport
                 }
             }
 
-            (Spell Spell, SpellLine Line) buff = spells
-                .Where(entry => entry.Spell.IsBuff && entry.Spell.Target == eSpellTarget.PET &&
-                                !IsCovenantPetHot(characterClass, petOwnerSpec, entry.Spell) &&
-                                !CompanionFollowPolicy.DeferBuff(owner, entry.Spell) &&
-                                ShouldMaintainRoutinePetBuff(entry.Spell, combatTarget?.IsAlive == true &&
-                                    (owner.InCombat || pet.InCombat), owner) &&
-                                CanCast(owner, entry.Spell) &&
-                                (entry.Spell.SpellType == eSpellType.PetSpell
-                                    ? NeedsNecromancerPetCommand(pet, entry.Spell)
-                                    : !HasEffect(pet, entry.Spell)))
-                .OrderByDescending(entry => entry.Spell.Level)
-                .FirstOrDefault();
+            bool petFight = combatTarget?.IsAlive == true && (owner.InCombat || pet.InCombat);
+            (Spell Spell, SpellLine Line) buff = default;
+            for (int i = 0; i < spells.Count; i++)
+            {
+                var entry = spells[i];
+                if (buff.Spell != null && entry.Spell.Level <= buff.Spell.Level) continue;
+                if (entry.Spell.IsBuff && entry.Spell.Target == eSpellTarget.PET &&
+                    !IsCovenantPetHot(characterClass, petOwnerSpec, entry.Spell) &&
+                    !CompanionFollowPolicy.DeferBuff(owner, entry.Spell) &&
+                    ShouldMaintainRoutinePetBuff(entry.Spell, petFight, owner) &&
+                    CanCast(owner, entry.Spell) &&
+                    (entry.Spell.SpellType == eSpellType.PetSpell
+                        ? NeedsNecromancerPetCommand(pet, entry.Spell)
+                        : !HasEffect(pet, entry.Spell)))
+                    buff = entry;
+            }
             if (petActionReady && buff.Spell != null &&
                 !IsCovenantPetBuffDeferred(pet, now, combatOwnsPetTurn) &&
                 owner.IsWithinRadius(pet, Math.Max(200, buff.Spell.CalculateEffectiveRange(owner))))
@@ -618,8 +635,7 @@ public static class AutonomousPetSupport
 
         if (combatTarget?.IsAlive == true && GameLoop.GameLoopTime >= nextDeployablePetTick)
         {
-            (Spell Spell, SpellLine Line) theurgistPet = ChooseWeightedByRank(
-                spells.Where(entry => entry.Spell.SpellType == eSpellType.SummonTheurgistPet && CanCast(owner, entry.Spell)),
+            (Spell Spell, SpellLine Line) theurgistPet = ChooseCastableByRank(owner, spells, eSpellType.SummonTheurgistPet,
                 owner is GameBot { IsEndgameCompanion: true });
             if (theurgistPet.Spell != null && owner.IsWithinRadius(combatTarget, theurgistPet.Spell.CalculateEffectiveRange(owner)))
             {
@@ -1511,7 +1527,8 @@ public static class AutonomousPetSupport
             cache.Items = UncachedBotKnownSpells(bot).ToArray();
             cache.Automated = Array.FindAll(cache.Items, entry => AnimistSingleTargetPolicy.AllowsAutomatedSpell(entry.Spell));
             cache.Source = source; cache.Count = source?.Count ?? 0; cache.Level = bot.Level;
-            cache.Until = now + 10_000;
+            // The fingerprint above (list, count, level) catches training and levelling; the timer is only a backstop.
+            cache.Until = now + 60_000;
             return cache.Items;
         }
     }
@@ -1640,6 +1657,46 @@ public static class AutonomousPetSupport
         pool.Clear();
         foreach (var entry in available)
             if (entry.Spell != null) pool.Add(entry);
+        return ChooseFromPool(pool, highestRankOnly);
+    }
+
+    /// <summary>
+    /// <see cref="ChooseWeightedByRank"/> over the castable main pet summons (<paramref name="type"/> null) or the castable
+    /// spells of one type, without a LINQ chain: pet classes without a pet ask every turn (run 23 allocation trace: pet
+    /// upkeep was the largest allocator).
+    /// </summary>
+    private static (Spell Spell, SpellLine Line) ChooseCastableByRank(GameLiving owner, IReadOnlyList<(Spell Spell, SpellLine Line)> spells,
+        eSpellType? type, bool highestRankOnly)
+    {
+        List<(Spell Spell, SpellLine Line)> pool = _rankPool ??= new();
+        pool.Clear();
+        for (int i = 0; i < spells.Count; i++)
+        {
+            var entry = spells[i];
+            if (entry.Spell == null || (type.HasValue ? entry.Spell.SpellType != type.Value : !IsMainPetSummon(entry.Spell.SpellType)) ||
+                !CanCast(owner, entry.Spell))
+                continue;
+            pool.Add(entry);
+        }
+        return ChooseFromPool(pool, highestRankOnly);
+    }
+
+    /// <summary>The Sorcerer's charm for the target level: highest value, then highest level, the first listed among equals.</summary>
+    private static Spell BestSorcererCharm(GameLiving owner, IReadOnlyList<(Spell Spell, SpellLine Line)> spells, int targetLevel)
+    {
+        Spell best = null;
+        for (int i = 0; i < spells.Count; i++)
+        {
+            Spell spell = spells[i].Spell;
+            if (spell == null || spell.SpellType != eSpellType.Charm || targetLevel > spell.Value) continue;
+            if (best != null && (spell.Value < best.Value || spell.Value == best.Value && spell.Level <= best.Level)) continue;
+            if (CanCast(owner, spell)) best = spell;
+        }
+        return best;
+    }
+
+    private static (Spell Spell, SpellLine Line) ChooseFromPool(List<(Spell Spell, SpellLine Line)> pool, bool highestRankOnly)
+    {
         if (pool.Count == 0)
             return default;
 
