@@ -9,7 +9,7 @@ A Dark Age of Camelot server for Linux, built on an OpenDAoC fork. It hosts play
 machine together with two kinds of bots, and ships as **one portable folder**: no .NET install,
 no Wine, no Docker. The game client is not part of the project; players install it separately.
 
-- **World:** Classic + Shrouded Isles (no Trials of Atlantis), the world of Offline DAoC 0.35.
+- **World:** Classic + Shrouded Isles (no Trials of Atlantis), the world of Offline DAoC 0.37.
 - **Classes:** the classic Classic + SI classes. The custom Sluaghbinder class exists in the code
   but is switched off (`classes / enable_sluaghbinder = False`), and it needs a patched client.
 - **Bots:** autonomous gamebots that live in the world, and companion bots that players summon.

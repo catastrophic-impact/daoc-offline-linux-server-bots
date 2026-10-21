@@ -82,7 +82,7 @@ These are automated and log checks. In game, the owner has used the predecessor 
 |---|---|
 | Build | 0 errors (~650 pre-existing warnings) |
 | Tests | 2,754 passed, 0 failed (0.35 sync, 2026-10-09) |
-| World build | ~95 s, 68 MB; identical to Offline DAoC 0.35's pristine world (0 differing tables) |
+| World build | ~95 s, 68 MB; identical to Offline DAoC's pristine world for the synced release (0 differing tables for 0.36; 0.37 checked row by row) |
 | Fresh release start | Ready in ~21 s; 99/99 navmeshes (measured at 0.33; not re-measured for 0.35's 103) |
 | Bot logins | 9 new bots in the world in about 1 s; full AI active within 30 s; 0 errors |
 | Stop | Saves and exits in ~2 s |
