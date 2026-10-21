@@ -90,16 +90,34 @@ if [[ $MODE == apply ]] && [[ -n $(git -C "$REPO" status --porcelain) ]]; then
 fi
 
 rc=0
+merged=(); conflicted=()
 for g in "${GROUPS_ARGS[@]}"; do
   IFS='|' read -r patch strip dest prefix <<<"$g"
   flags=(-p"$strip" --directory="$dest" --whitespace=nowarn)
   if [[ $MODE == check ]]; then
     if git -C "$REPO" apply --check "${flags[@]}" "$patch" 2>"$work/err"; then echo "ok      $prefix -> $dest"
-    else echo "CONFLICT $prefix -> $dest"; sed 's/^/    /' "$work/err" | head -20; rc=1; fi
-  else
-    echo "applying $prefix -> $dest"
-    git -C "$REPO" apply --reject "${flags[@]}" "$patch" || { echo "rejects left as .rej files under $dest" >&2; rc=1; }
+    else
+      echo "CONFLICT $prefix -> $dest  (apply would fall back to a 3-way merge for:)"
+      sed -n 's/^error: \(.*\): patch does not apply$/    \1/p' "$work/err"; rc=1
+    fi
+    continue
   fi
+  echo "applying $prefix -> $dest"
+  # Files our edits keep from patching cleanly: apply everything else, then 3-way merge those
+  # (base = upstream at the synced sha, theirs = the new version, ours = our file).
+  mapfile -t bad < <(git -C "$REPO" apply --check "${flags[@]}" "$patch" 2>&1 | sed -n 's/^error: \(.*\): patch does not apply$/\1/p')
+  excludes=(); for f in "${bad[@]}"; do excludes+=(--exclude="$f"); done
+  git -C "$REPO" apply "${flags[@]}" "${excludes[@]}" "$patch" || { echo "apply failed for $dest" >&2; rc=1; continue; }
+  for f in "${bad[@]}"; do
+    up="$prefix/${f#"$dest"/}"
+    git -C "$CACHE" cat-file -e "$FROM:$up" 2>/dev/null || { echo "  cannot 3-way $f (not in upstream $FROM)" >&2; conflicted+=("$f"); continue; }
+    git -C "$CACHE" show "$FROM:$up" >"$work/base"; git -C "$CACHE" show "$TO_SHA:$up" >"$work/theirs"
+    if git merge-file -L ours -L "upstream-$FROM" -L "upstream-$TO_SHA" "$REPO/$f" "$work/base" "$work/theirs"; then merged+=("$f"); else conflicted+=("$f"); fi
+  done
 done
-(( rc == 0 )) && [[ $MODE == apply ]] && echo "Applied. Build, test, then update UPSTREAM.md and ${NAME}_SYNCED in tools/upstream/upstreams.conf."
+(( ${#merged[@]} )) && { echo "Merged cleanly with our edits kept (review these):"; printf '  %s\n' "${merged[@]}"; }
+if (( ${#conflicted[@]} )); then
+  echo "CONFLICTS to resolve by hand (look for <<<<<<< ours markers):"; printf '  %s\n' "${conflicted[@]}"; rc=1
+fi
+(( rc == 0 )) && [[ $MODE == apply ]] && echo "Applied. Build, test, then update UPSTREAM.md, ${NAME}_SYNCED in tools/upstream/upstreams.conf and AdminService.OfflineDaocVersion."
 exit $rc
